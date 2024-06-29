@@ -3,7 +3,7 @@
 #include <TickTwo.h>
 //#include <EasyNeoPixels.h>  //TODO change over to underlying adafruit library
 #include "Squeezer.h"
-#include <Adafruit_NeoPixel.h>
+// #include <Adafruit_NeoPixel.h>
 #include <Button2.h>
 #include <HX711.h>  //this is non blocking.  hope it works
 #if defined(ESP8266) || defined(ESP32) || defined(AVR)
@@ -21,12 +21,13 @@ static const BaseType_t app_cpu = 1;
 
 
 // define ledticker
-TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);
+// TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);
 TickTwo BattChecker(BatSnsCk, Batt_CK_Interval, 0, MILLIS);
 //TickTwo DataSimtimer(SIMLD, 1000, 0, MILLIS);  //default si calling once per sec
 
-//setup Button2
+//construct Button2
 Button2 button;   //StartButton
+//comment--why not just handle it as an input? In Rev 1 what does it do other than START?
 
 
 BLEServer* pServer = NULL;
@@ -129,6 +130,7 @@ void setup() {
   // button.setPressedHandler(pressed);
   // button.setReleasedHandler(released);
 
+// doesn't all this go away?
   button.setTapHandler(click);
   button.setClickHandler(click);
   button.setLongClickDetectedHandler(longClickDetected);
@@ -138,7 +140,7 @@ void setup() {
   //button.setDoubleClickHandler(doubleClick);
   //button.setTripleClickHandler(tripleClick);
 
-  LEDtimer.start();     //start LED timer
+  //LEDtimer.start();     //start LED timer
   BattChecker.start();  //start Batt checker
 
 
@@ -186,7 +188,7 @@ void setup() {
   // this value is obtained by calibrating the scale with known weights; see the README for details
   scale.tare();  // reset the scale to 0
 
-  pixels.begin();  // INITIALIZE NeoPixel strip object (REQUIRED)
+  //pixels.begin();  // INITIALIZE NeoPixel strip object (REQUIRED)
 
   oldmillis = millis();
   el_time = millis() - oldmillis;
