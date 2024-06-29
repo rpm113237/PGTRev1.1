@@ -1,4 +1,4 @@
-//R. P. McClellan 27Jun2023; latest 9/9/23
+//R. P. McClellan 27Jun2023; latest 9/9/23; latest 29Jun24
 /*
 09Oct23--clean up; get rid of some comments, make a subroutine or two.  TODO--put ledbLINK CALL INTO delay function to keep
 led's alive during delay for kodular to do text to speech. Make lights go on during last part of hold rest 
