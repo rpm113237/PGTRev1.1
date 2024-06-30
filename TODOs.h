@@ -22,7 +22,7 @@ TODO--add in ADC read of batsns; new cmd E: (Done)
 
 TODO--why in the hell does the Soundwakeup sound twice on first call?  
 
-TODO--Blink only works for one LED--not sure it works reliably there.  Class?
+TODO--Consider making LED blinking a PWM??
 
 
 

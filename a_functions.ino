@@ -23,16 +23,16 @@ void FindCalibration() {
   }
 }
 
-void PingAndCheckForce(int numTimes) {
-  int i;
-  for (i = 1; i <= numTimes; i++) {
-    BLETX("S:PING");         //needs shorter time in bletx, scale read is 250ms or so
-    if (scale.is_ready()) {  //.get_units is blocking.
-      scaleVal = scale.get_units(scaleSamples / 3);
-      BLETX("HF:%d:B:%.1f", hand_num, 0, scaleVal);  //report max //simulate
-    }
-  }
-}
+// void PingAndCheckForce(int numTimes) {
+//   int i;
+//   for (i = 1; i <= numTimes; i++) {
+//     BLETX("S:PING");         //needs shorter time in bletx, scale read is 250ms or so
+//     if (scale.is_ready()) {  //.get_units is blocking.
+//       scaleVal = scale.get_units(scaleSamples / 3);
+//       BLETX("HF:%d:B:%.1f", hand_num, 0, scaleVal);  //report max //simulate
+//     }
+//   }
+// }
 
 void CheckForce(void) {
 
@@ -43,37 +43,37 @@ void CheckForce(void) {
 }
 
 
-void click(Button2& btn) {
-  //Serial.println("click--pause/unpause");
-  //do restore
-  if (sqstate == sqPause) {
-    oldmillis = millis() - pause_el_time;
-    sqstate = paused_State;
-    BLETX("V:Resuming");
-    Serial.printf("Un pausing....\n");
-    MorseChar('o');
+// void click(Button2& btn) {
+//   //Serial.println("click--pause/unpause");
+//   //do restore
+//   if (sqstate == sqPause) {
+//     oldmillis = millis() - pause_el_time;
+//     sqstate = paused_State;
+//     BLETX("V:Resuming");
+//     Serial.printf("Un pausing....\n");
+//     MorseChar('o');
 
-  } else {
-    //do store & got to sqState
-    Serial.printf("Pausing....\n");
-    BLETX("V:Pausing");
-    MorseChar('5');
-    pause_el_time = el_time;  //el_time can be used in sqPause
-    paused_State = sqstate;
-    sqstate = sqPause;
-    oldmillis = millis();
-  }
-}
-void longClickDetected(Button2& btn) {
-  Serial.println("long click detected; go to sleep");
-  MorseChar('5');
-  MorseChar('5');
-  BLETX("V:Goodbye");
-  newseqstate(WRAPUP, HI_LOW_LED, 0, clrs.OFF);  //resets oldmillis
-}
-void longClick(Button2& btn) {
-  Serial.println("long click\n");
-}
+//   } else {
+//     //do store & got to sqState
+//     Serial.printf("Pausing....\n");
+//     BLETX("V:Pausing");
+//     MorseChar('5');
+//     pause_el_time = el_time;  //el_time can be used in sqPause
+//     paused_State = sqstate;
+//     sqstate = sqPause;
+//     oldmillis = millis();
+//   }
+// }
+// void longClickDetected(Button2& btn) {
+//   Serial.println("long click detected; go to sleep");
+//   MorseChar('5');
+//   MorseChar('5');
+//   BLETX("V:Goodbye");
+//   newseqstate(WRAPUP, HI_LOW_LED, 0, clrs.OFF);  //resets oldmillis
+// }
+// void longClick(Button2& btn) {
+//   Serial.println("long click\n");
+// }
 
 void initVals(void) {
 
