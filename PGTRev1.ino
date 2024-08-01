@@ -3,7 +3,7 @@
 #include <TickTwo.h>
 //#include <EasyNeoPixels.h>  //TODO change over to underlying adafruit library
 #include "Squeezer.h"
-// #include <Adafruit_NeoPixel.h>
+//#include <Adafruit_NeoPixel.h>
 #include <Button2.h>
 #include <HX711.h>  //this is non blocking.  hope it works
 #if defined(ESP8266) || defined(ESP32) || defined(AVR)
@@ -20,13 +20,13 @@ static const BaseType_t app_cpu = 1;
 //the c3 seems to run on 0 regardless of where it is set.
 
 
-// define ledticker
-TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);
+// define ledticker, battchecker
+TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);  //calls LEDBlink, called every 10MS, repeats forever, resolution MS
 TickTwo BattChecker(BatSnsCk, Batt_CK_Interval, 0, MILLIS);
-//TickTwo DataSimtimer(SIMLD, 1000, 0, MILLIS);  //default si calling once per sec
+
 
 //construct Button2
-Button2 button;   //StartButton
+//Button2 button;   //StartButton
 //comment--why not just handle it as an input? In Rev 1 what does it do other than START?
 
 
@@ -87,15 +87,17 @@ class MyServerCallbacks : public BLEServerCallbacks {
 class MyCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) {
     rxValue = pCharacteristic->getValue();
-    if (rxValue.length() > 0) {
-      Serial.println("*********");
-      Serial.print("Received Value: ");
-      for (int i = 0; i < rxValue.length(); i++)
-        Serial.print(rxValue[i]);
+    // if (rxValue.length() > 0) {
+    //   //Serial.println("*********");
+    //   Serial.print("Received Value: ");
+    //   for (int i = 0; i < rxValue.length(); i++)
+    //     Serial.print(rxValue[i]);
 
-      Serial.println();
-      Serial.println("*********");
-    }
+    //    Serial.println();
+    //   // Serial.println("*********");
+    // }
+    // Serial.printf("lenght of rxValue = %d\n", rxValue.length());      
+
   }
 };
 
@@ -106,43 +108,27 @@ void setup() {
   // initialize serial communication at 115200 bits per second:
   //int i = 0; // old FORTRAN programmers never die
   Serial.begin(115200);
-  Serial.println("Hello from Squeezer v17Oct");
+  Serial.printf("\nHello from Protocol Grip Trainer v25Jul24\n");
 
-  ledcAttach(buzzPin, freq, resolution);   //eight bit resolution--why? (Jun24?)
-  // ledcSetup(ledChannel, freq, resolution);  // have to do this first to avoid weird run time error
-  // ledcAttachPin(buzzPin, ledChannel);       //attach buzzer to 19
-
+  ledcAttach(buzzPin, freq, resolution);   //eight bit resolution--why? (Jun24?); using for PWM
+  
   print_wakeup_reason();
   Soundwakeup();  //wake up feedback
 
-  //set up Button2 button
-  //Serial.println("Button Demo");
+  //set up button handler.  Only needed if PGT initiated shutdown
+  // button.begin(StartButton);
+  // button.setLongClickTime(LongClickTime);
+  // button.setLongClickDetectedHandler(longClickDetected);   
+  // button.setLongClickDetectedRetriggerable(false);  // don't call the long click handler more than once  
 
-  button.begin(StartButton);
-  button.setLongClickTime(3000);
-  // button.setDoubleClickTime(400);
+  //set up LED's
+  pinMode(LEDRED, OUTPUT);
+  pinMode(LEDBLUE, OUTPUT);
+  pinMode(StartButton, INPUT);
 
-  // Serial.println("Longpress Time:\t" + String(button.getLongClickTime()) + "ms");
-  // Serial.println("DoubleClick Time:\t" + String(button.getDoubleClickTime()) + "ms");
-  // Serial.println();
-
-  // button.setChangedHandler(changed);
-  // button.setPressedHandler(pressed);
-  // button.setReleasedHandler(released);
-
-// doesn't all this go away?
-  button.setTapHandler(click);
-  button.setClickHandler(click);
-  button.setLongClickDetectedHandler(longClickDetected);
-  //button.setLongClickHandler(longClick);
-  button.setLongClickDetectedRetriggerable(false);
-
-  //button.setDoubleClickHandler(doubleClick);
-  //button.setTripleClickHandler(tripleClick);
-
-  //LEDtimer.start();     //start LED timer
+  //start the TickTwo timers
+  LEDtimer.start();     //start LED timer
   BattChecker.start();  //start Batt checker
-
 
   // Create the BLE Device
   BLEDevice::init("Squeezer");
@@ -182,66 +168,56 @@ void setup() {
   // Serial.print("read average of 20--stabilize: \t\t");
   Serial.printf("*********Warm up read 20X; val = %.2f*********\n", scale.read_average(20));  // print the average of 20 readings from the ADC
                                                                                               //************* to stand out in log
-  scale.set_scale(9631.0);  
+  scale.set_scale(9631.0);  //This value needs to be default; a cal function needs to be implemented
   // scale.set_scale(scaleCal); 
                                                                     // need
   // this value is obtained by calibrating the scale with known weights; see the README for details
   scale.tare();  // reset the scale to 0
 
-  //pixels.begin();  // INITIALIZE NeoPixel strip object (REQUIRED)
 
   oldmillis = millis();
   el_time = millis() - oldmillis;
-  setLED(CHG_CONNECT_LED, 500, clrs.BLUE);
+  //setLED(CHG_CONNECT_LED, 500, clrs.BLUE);
+  pixels.setPixelColor(LEDSelect, pixels.Color(clrs.RED[0], clrs.RED[1], clrs.RED[2]));
+  pixels.show();  // Send the updated pixel colors to the hardware.
 
   Serial.print("Connecting (BLE)\n");
-  while (!deviceConnected && (el_time < sys_params.CONN_WAIT_TM)) {
+  BlinkTime = CNCT_LED_BLINK_TIME;
+  BatSnsCk(); //sets color for connect led  
+  while (!deviceConnected && (el_time < CONN_WAIT_TM)) {
     if ((el_time % 1000) <= 10){
        Serial.print(".");
        //pServer->startAdvertising();  // restart advertising
     }
-    LEDBlink();  //has to be called, since timer isn't
+    LEDBlink();  //has to be called, since timer isn't being called?? or call timer?
     delay(10);
     el_time = millis() - oldmillis;
   }
 
   if (!deviceConnected) {
     Serial.printf("****end of setup; not connected****\n");
-    newseqstate(START, CHG_CONNECT_LED, 0, clrs.OFF);
+    // newseqstate(START, CHG_CONNECT_LED, 0, clrs.OFF);
   } else {
     Serial.printf("****end of setup; BLE connected****\n");
-    // BLETX("S:PING");
-    C3Delay(3000);
-    //give app time to announce connection.
-    newseqstate(START, CHG_CONNECT_LED, 0, clrs.BLUE);  //solid blue = connected
+    pixels.setPixelColor(LEDSelect, pixels.Color(clrs.BLUE[0], clrs.BLUE[1], clrs.BLUE[2]));
+    pixels.show();  // Send the updated pixel colors to the hardware.
+    BlinkTime = 0;
+        
   }
-  initVals();
-  hand_num = 0;
+  // initVals();
+  // hand_num = 0;
   //while (1);
 }
 
 void loop() {
-  //do we want this here??
-  if (!deviceConnected && oldDeviceConnected) {
-    delay(10);                    // give the bluetooth stack the chance to get things ready
-    pServer->startAdvertising();  // restart advertising
-    Serial.println(" in loop;start advertising");
-    oldDeviceConnected = deviceConnected;
-  }
-  // connecting
-  if (deviceConnected && !oldDeviceConnected) {
-    Serial.println(" This should happen once");
-    // do stuff here on connecting
-    oldDeviceConnected = deviceConnected;
-  }
-
+  
+  BattChecker.update();  // BatSnsCk checks battery, sends voltage
   LEDtimer.update();     //should call the ledBlink every 10ms.
-  BattChecker.update();  //coded for ten secons--put in .h
-  button.loop();
-  if (scale.is_ready()) {  //.get_units is blocking.
-          scaleVal = scale.get_units(scaleSamples / 3);
-          BLETX("HF:%d:R:%.1f", hand_num, 0, scaleVal);  //report max //simulate
-
-  }
+  RxStringParse();
+  //button.loop();    // what for?? do we want device turn off?
+  BLEReconnect();   //TODO does this work???
+  CheckForce();     //check force does the sending.  
+  //delay(1000);
+ 
   
 }  //end of loop
