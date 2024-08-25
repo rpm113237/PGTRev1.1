@@ -164,7 +164,9 @@ void setup() {
   //pinMode(StartButton, INPUT);  // Right now, used only to wake up out of deep sleep--done in Button2??
 
   //set up the scale
+  
   scale.begin(HX711_dout, HX711_sck);
+  scale.reset();    //if coming out of deep sleep; scale might be powered down
   // Serial.print("read average of 20--stabilize: \t\t");
   Serial.printf("*********Warm up read 20X; val = %.2f*********\n", scale.read_average(20));  // print the average of 20 readings from the ADC
                                                                                               //************* to stand out in log

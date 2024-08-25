@@ -4,9 +4,10 @@ void RxStringParse(void){
     // else Serial.printf("Start button is HIGH\n");
     if ((rxValue.length() > 0) || (digitalRead(StartButton)==LOW) ) {   //awkward, do we need to check length?
       Serial.printf("rxValue %s\n", rxValue.c_str()); 
+      Serial.printf ("rxValue[0], to upper is %c\n", toupper(rxValue[0]));
       if ((toupper(rxValue[0]) =='X') || (digitalRead(StartButton)==LOW)){
         //Serial.printf (" X found\n");
-      
+      scale.power_down();
       MorseChar(SHAVE_HAIRCUT);
       pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));
       pixels.show();  // Send the updated pixel colors to the hardware.
@@ -15,8 +16,31 @@ void RxStringParse(void){
       esp_deep_sleep_start(); 
       Serial.println("This never happens");
         }
+        /*Procedure for calibration is:
+        --app sends an X for tare.  tare is done on start up, but good practice. Tare takes 20 samples--2 sec +/-
+        --app sends X:NN.N.  NN.N is in lbs/kilograms Note: the calibration is actually 
+        the scale calibrates, stores the calibration factor.
+
+        */
       else if (toupper(rxValue[0]) =='C'){
         Serial.printf (" C found, do calibration now\n");
+        std::string calstring;    //string that is weight 
+        calstring = rxValue.substr(1, rxValue.length());
+        if (calstring.length()>0){
+        uint32_t calweight = uint32_t (stof(calstring) *10);    //have to divide the readings by ten
+        Serial.printf("calweight (*10) = %ld\n", calweight);
+        scale.calibrate_scale(calweight,20); //20 times should be plenty
+        float calcscale = scale.get_scale();
+        Serial.printf(" calscale = %f \n", calcscale );
+        }
+        else Serial.printf("Zero length cal value string\n");
+      }
+      else if (toupper(rxValue[0] == 'T')){   //tare
+      Serial.printf("***Doing tare***\n");
+        scale.tare(20);   //20X should be plenty
+        long scaleoffset = scale.get_offset();
+        Serial.printf ("Tare done, offset = %ld\n", scaleoffset);
+      
 
       }
       else {Serial.printf("Character 0 is %c \n", toupper(rxValue[0])); }
