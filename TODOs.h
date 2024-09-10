@@ -51,6 +51,12 @@ Thge LED blinking code is messy.  LedSelect no longer relevant--only one LED.  C
 
 ***The BLE initial connect and the in loop reconnect seem redundant and awkward.
 
+!!!! look at aclibrated ADC reads, also cal routine.
+
+TODO???? Run cal routines off the serial monitor at setup?
+
+Figure out why TxString needs cleared--or at least integrate it into bletx
+
 
 
 

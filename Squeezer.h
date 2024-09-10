@@ -74,6 +74,9 @@ float Batt_HI_Lvl = 3.6;
 float Batt_OK_Lvl = 3.5;
 float Batt_LO_Lvl = 3.3;
 const int Batt_CK_Interval = 60 * MS_TO_SEC;
+#define Battmah 1000
+#define Runmah  70
+#define BattFullTime (Battmah/Runmah)*60    //in minutes
 
 //StartSwitch--TODO--second switch, if needed.
 const int StartButton = 1;  //

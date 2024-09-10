@@ -1,57 +1,50 @@
-void RxStringParse(void){
-    //Serial.printf("length of rxValue in RxParseString = %d\n", rxValue.length()); 
-    if ((digitalRead(StartButton)==LOW)) Serial.printf("Start button is LOW\n");
-    // else Serial.printf("Start button is HIGH\n");
-    if ((rxValue.length() > 0) || (digitalRead(StartButton)==LOW) ) {   //awkward, do we need to check length?
-      Serial.printf("rxValue %s\n", rxValue.c_str()); 
-      Serial.printf ("rxValue[0], to upper is %c\n", toupper(rxValue[0]));
-      if ((toupper(rxValue[0]) =='X') || (digitalRead(StartButton)==LOW)){
-        //Serial.printf (" X found\n");
+void RxStringParse(void) {
+  //Serial.printf("length of rxValue in RxParseString = %d\n", rxValue.length());
+  if ((digitalRead(StartButton) == LOW)) Serial.printf("Start button is LOW\n");
+  // else Serial.printf("Start button is HIGH\n");
+  if ((rxValue.length() > 0) || (digitalRead(StartButton) == LOW)) {  //awkward, do we need to check length?
+    Serial.printf("rxValue %s\n", rxValue.c_str());
+    Serial.printf("rxValue[0], to upper is %c\n", toupper(rxValue[0]));
+    if ((toupper(rxValue[0]) == 'X') || (digitalRead(StartButton) == LOW)) {
+      //Serial.printf (" X found\n");
       scale.power_down();
       MorseChar(SHAVE_HAIRCUT);
       pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));
       pixels.show();  // Send the updated pixel colors to the image.pngimage.pnghardware.
       Serial.printf("******Going to Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
       esp_deep_sleep_enable_gpio_wakeup(1 << StartButton, ESP_GPIO_WAKEUP_GPIO_LOW);
-      esp_deep_sleep_start(); 
+      esp_deep_sleep_start();
       Serial.println("This never happens");
-        }
-        /*Procedure for calibration is:
+    }
+    /*Procedure for calibration is:
         --app sends an X for tare.  tare is done on start up, but good practice. Tare takes 20 samples--2 sec +/-
         --app sends X:NN.N.  NN.N is in lbs/kilograms Note: the calibration is actually 
         the scale calibrates, stores the calibration factor.
 
         */
-      else if (toupper(rxValue[0]) =='C'){
-        Serial.printf (" C found, do calibration now\n");
-        std::string calstring;    //string that is weight 
-        calstring = rxValue.substr(1, rxValue.length());
-        if (calstring.length()>0){
-        uint32_t calweight = uint32_t (stof(calstring) *10);    //have to divide the readings by ten
+    else if (toupper(rxValue[0]) == 'C') {
+      Serial.printf(" C found, do calibration now\n");
+      std::string calstring;  //string that is weight
+      calstring = rxValue.substr(1, rxValue.length());
+      if (calstring.length() > 0) {
+        uint32_t calweight = uint32_t(stof(calstring) * 10);  //have to divide the readings by ten
         Serial.printf("calweight (*10) = %ld\n", calweight);
-        scale.calibrate_scale(calweight,20); //20 times should be plenty
+        scale.calibrate_scale(calweight, 20);  //20 times should be plenty
         float calcscale = scale.get_scale();
-        Serial.printf(" calscale = %f \n", calcscale );
-        }
-        else Serial.printf("Zero length cal value string\n");
-      }
-      else if (toupper(rxValue[0] == 'T')){   //tare
+        Serial.printf(" calscale = %f \n", calcscale);
+      } else Serial.printf("Zero length cal value string\n");
+    } else if (toupper(rxValue[0] == 'T')) {  //tare
       Serial.printf("***Doing tare***\n");
-        scale.tare(20);   //20X should be plenty
-        long scaleoffset = scale.get_offset();
-        Serial.printf ("Tare done, offset = %ld\n", scaleoffset);
-      
+      scale.tare(20);  //20X should be plenty
+      long scaleoffset = scale.get_offset();
+      Serial.printf("Tare done, offset = %ld\n", scaleoffset);
 
-      }
-      else {Serial.printf("Character 0 is %c \n", toupper(rxValue[0])); }
-      rxValue.clear();  //erases     
-          
+
+    } else {
+      Serial.printf("Character 0 is %c \n", toupper(rxValue[0]));
     }
-      
-
-      
-
-
+    rxValue.clear();  //erases
+  }
 }
 
 
@@ -62,7 +55,7 @@ void BLEReconnect(void) {
     delay(10);                    // give the bluetooth stack the chance to get things ready
     pServer->startAdvertising();  // restart advertising
     Serial.println(" in loop reconnect ;start advertising");
-    setLED(250,clrs.BLUE);
+    setLED(250, clrs.BLUE);
     oldDeviceConnected = deviceConnected;
   }
   // connecting
@@ -70,14 +63,14 @@ void BLEReconnect(void) {
     Serial.println(" setting old device; This should happen once");
     // pixels.setPixelColor(LEDSelect, pixels.Color(clrs.BLUE[0], clrs.BLUE[1], clrs.BLUE[2]));
     // pixels.show();  // Send the updated pixel colors to the hardware.
-    setLED(0,clrs.BLUE);
+    setLED(0, clrs.BLUE);
     // do stuff here on connecting
     oldDeviceConnected = deviceConnected;
   }
 }
 
 
-void FindCalibration() {    //never checked out.
+void FindCalibration() {  //never checked out.
   //set to something like 50 lbs
   // set cal factor to rawreading/50 (or whatever)
   float lclrawval = 0;
@@ -100,75 +93,65 @@ void FindCalibration() {    //never checked out.
   }
 }
 
-int floatcomp(const void* elem1, const void* elem2)
-{
-    if(*(const float*)elem1 < *(const float*)elem2)
-        return -1;
-    return *(const float*)elem1 > *(const float*)elem2;
+int floatcomp(const void* elem1, const void* elem2) {
+  if (*(const float*)elem1 < *(const float*)elem2)
+    return -1;
+  return *(const float*)elem1 > *(const float*)elem2;
 }
 
-void CheckForce(void) { //PGT1 changed
-  int i = 0; //force array index
-  int arraysz = sizeof(Force.ForceArray)/sizeof(Force.ForceArray[0]);
+void CheckForce(void) {  //PGT1 changed
+  int i = 0;             //force array index
+  int arraysz = sizeof(Force.ForceArray) / sizeof(Force.ForceArray[0]);
   if (scale.is_ready()) {  //.get_units is blocking.
     scaleVal = scale.get_units(scaleSamples);
-    for (i = (arraysz-1); i >0; i--){
-      Force.ForceArray[i]= Force.ForceArray[i-1];   //move everything up one spot
+    for (i = (arraysz - 1); i > 0; i--) {
+      Force.ForceArray[i] = Force.ForceArray[i - 1];  //move everything up one spot
     }
     Force.ForceArray[0] = scaleVal;
     //now find max, min, mean
-    Force.ForceMax = scaleVal;   
+    Force.ForceMax = scaleVal;
     Force.ForceMin = scaleVal;
     Force.ForceMean = 0;
-    for (i=0; i<arraysz; i++){
-      // Serial.printf("%.3f ",Force.ForceArray[i]);
-      if (Force.ForceArray[i]>Force.ForceMax) Force.ForceMax=Force.ForceArray[i];
-      if (Force.ForceArray[i]<Force.ForceMin) Force.ForceMin=Force.ForceArray[i];
-      Force.ForceMean += Force.ForceArray[i];      
+    for (i = 0; i < arraysz; i++) {      
+      if (Force.ForceArray[i] > Force.ForceMax) Force.ForceMax = Force.ForceArray[i];
+      if (Force.ForceArray[i] < Force.ForceMin) Force.ForceMin = Force.ForceArray[i];
+      Force.ForceMean += Force.ForceArray[i];
     }
-    // Serial.printf("\nForceMeanR = %.3f, \tArray len = %d\n", Force.ForceMean, arraysz);
-    Force.ForceMean= Force.ForceMean/arraysz;
-    float wkarray[FORCE_ARRAY_LEN];    //temp array for sorting
-    // Serial.printf("Force = %.3f\n", scaleVal);
-    // Serial.printf("unsorted\t");
-    // for(i = 0; i < 10; i++)
-    //  Serial.printf("%.3f\t", Force.ForceArray[i]);
-    // Serial.printf("\n");   
-
-    for (i=0;i<arraysz; i++) wkarray[i]=Force.ForceArray[i];
-    qsort(wkarray, arraysz, sizeof(float), floatcomp);
-  //   Serial.printf("  sorted\t");
-  //  for(i = 0; i < 10; i++)
-  //     Serial.printf("%.3f\t", wkarray[i]);
-  //  Serial.printf("\n");   
-   if (arraysz %2 ==0) Force.ForceMedian = (wkarray[arraysz/2] +wkarray[arraysz/2 + 1])/2;
-   else Force.ForceMedian = wkarray[arraysz/2 + 1];
-   //Serial.printf("median = %.4f\n\n", Force.ForceMedian);
-   
-
-
-    // Serial.printf("ForceMeanA = %.3f, \tArray len = %d\n", Force.ForceMean,arraysz);
-    // Serial.printf("\tHF= %.3f\t",scaleVal);
-    // Serial.printf("Mean= %.3f\t",Force.ForceMean);
-    // Serial.printf("Max= %.3f\t", Force.ForceMax);
-    // Serial.printf("Min= %.3f\t", Force.ForceMin);
-    // Serial.printf("Delta = %.3f\n", (Force.ForceMax-Force.ForceMin));
-
-    sprintf(TxString, "HF:%.3f", scaleVal);
-    BLETX();  //transmits TxString
     
+    Force.ForceMean = Force.ForceMean / arraysz;
+    float wkarray[FORCE_ARRAY_LEN];  //temp array for sorting
+    
+    for (i = 0; i < arraysz; i++) wkarray[i] = Force.ForceArray[i];
+    qsort(wkarray, arraysz, sizeof(float), floatcomp);
+    //   Serial.printf("  sorted\t");
+    //  for(i = 0; i < 10; i++)
+    //     Serial.printf("%.3f\t", wkarray[i]);
+    //  Serial.printf("\n");
+    if (arraysz % 2 == 0) Force.ForceMedian = (wkarray[arraysz / 2] + wkarray[arraysz / 2 + 1]) / 2;
+    else Force.ForceMedian = wkarray[arraysz / 2 + 1];
+    
+    clrTxString();
+    sprintf(TxString, "HF:%.1f", scaleVal);
+    BLETX();  //transmits TxString
   }
 }
 
-void VibSend() {
-  
-  sprintf(TxString, "MX:%.3f,%.3f", Force.ForceMax, Force.ForceMin);
-  BLETX();
-  sprintf(TxString, "MN:%.3f,%.3f", Force.ForceMean, Force.ForceMedian);
-  BLETX();
+void clrTxString(void){
+  int i; int Txsize;
+  Txsize = sizeof(TxString)/sizeof(TxString[0]);
+  for (i=0; i<Txsize; i++)TxString[i]=0x00;  //needs cleared for some reason.
 }
 
-void setLED(int btime, int clrarray[3]) {  //incorporate into LEDBlink                                                    
+void VibSend() {
+  clrTxString();
+  sprintf(TxString, "M:%.1f,%.1f,%.1f", Force.ForceMax, Force.ForceMin,Force.ForceMean);
+  BLETX();
+  // clrTxString();
+  // sprintf(TxString, "MN:%.3f,%.3f", Force.ForceMean, Force.ForceMedian);
+  // BLETX();----median not being sent
+}
+
+void setLED(int btime, int clrarray[3]) {  //incorporate into LEDBlink
   int i = 0;
   BlinkTime = btime;
   for (i = 0; i < 3; i++) {
@@ -202,28 +185,7 @@ void LEDBlink() {
   pixels.show();
 }
 
-// void LEDBlink(void) {   //PGT1 Revised
-//   static u_long lclmillis = 0;
-//   static bool ON_OFF = true;  //true = ON??
 
-//   if (BlinkTime > 0) {
-//     if (((millis() - lclmillis) > BlinkTime) && ON_OFF) {
-//       if (UseRedLED) digitalWrite(LEDRED, HIGH);
-//       if (UseBlueLED) digitalWrite(LEDBLUE, HIGH);
-//       ON_OFF = false;
-//       lclmillis = millis();
-
-//     } else if (((millis() - lclmillis) > BlinkTime) && !ON_OFF) {
-//       if (UseRedLED) digitalWrite(LEDRED, LOW);
-//       if (UseBlueLED) digitalWrite(LEDBLUE, LOW);
-//       ON_OFF = true;
-//       lclmillis = millis();
-//     }
-//   } else {
-//     if (UseRedLED) digitalWrite(LEDRED, HIGH);
-//     if (UseBlueLED) digitalWrite(LEDBLUE, HIGH);
-//   }  //0 blink time is on solid
-// }
 
 void BLETX(void) {
 
@@ -232,7 +194,7 @@ void BLETX(void) {
     pTxCharacteristic->setValue(TxString);
     pTxCharacteristic->notify();
     Serial.printf("BLE\t%20s\n", TxString);
-                                           // bluetooth stack will go into congestion, if too many packets are sent
+    // bluetooth stack will go into congestion, if too many packets are sent
   } else Serial.printf("OFFline\t%20s\n", TxString);
 }
 
@@ -271,21 +233,49 @@ void print_wakeup_reason() {
 
 void BatSnsCk(void) {
   //reads the ADC on BatSns
-  //int batSOC = 0;
-  int battrdg = 0;  //raw
-  //float battvolts = 0.0;
+  int battpcnt;
+  int battvoltx100 = 0;  //batt volts *100, rounded to int
+  int battrdg = 0;       //raw
   battrdg = analogRead(BatSns);
-  battvolts = ((float)battrdg * 2 * 3.2 * 210 / 310) / 4095;  //fudge; something wrong with voltage divider--impedance too high--r11 = 210k? WTF??
+  //battvolts = ((float)battrdg * 2 * 3.2 * 210 / 310) / 4095;  //fudge; something wrong with voltage divider--impedance too high--r11 = 210k? WTF??
+  battvolts = ((float)battrdg/955);  //fudge for now; later do a calibration routine
   Serial.printf("******Battery: Raw = %d;  volts = %.2f****** \n", battrdg, battvolts);
-  sprintf(TxString, "E:%.2f", battvolts);
-  if (battvolts <= Batt_LO_Lvl) {
-    UseRedLED = true;
-    UseBlueLED = false;
-  } else {
-    UseBlueLED = true;
-    UseRedLED = false;
+  //sprintf(TxString, "E:%.2f", battvolts);
+  //reference: https://blog.ampow.com/lipo-voltage-chart/
+  battvoltx100 = roundf(battvolts * 100);
+  if (battvoltx100 >= 420) battpcnt = 100;
+  else if (battvoltx100 > 415) battpcnt = 95;
+  else if (battvoltx100 > 411) battpcnt = 90;
+  else if (battvoltx100 > 408) battpcnt = 85;
+  else if (battvoltx100 > 402) battpcnt = 80;
+  else if (battvoltx100 > 398) battpcnt = 75;
+  else if (battvoltx100 > 395) battpcnt = 70;
+  else if (battvoltx100 > 391) battpcnt = 65;
+  else if (battvoltx100 > 387) battpcnt = 60;
+  else if (battvoltx100 > 385) battpcnt = 55;
+  else if (battvoltx100 > 384) battpcnt = 50;
+  else if (battvoltx100 > 382) battpcnt = 45;
+  else if (battvoltx100 > 380) battpcnt = 40;
+  else if (battvoltx100 > 379) battpcnt = 35;
+  else if (battvoltx100 > 377) battpcnt = 30;
+  else if (battvoltx100 > 375) battpcnt = 25;
+  else if (battvoltx100 > 373) battpcnt = 20;
+  else if (battvoltx100 > 371) battpcnt = 15;
+  else if (battvoltx100 > 369) battpcnt = 10;
+  else if (battvoltx100 > 361) battpcnt = 05;
+
+  if (battvoltx100 < 371) UseRedLED = true;
+  if (battvoltx100 < 3.5) {
+    scale.power_down();
+    MorseChar(SHAVE_HAIRCUT);
+    Serial.printf("******Low Battery Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
+    esp_deep_sleep_enable_gpio_wakeup(1 << StartButton, ESP_GPIO_WAKEUP_GPIO_LOW);
+    esp_deep_sleep_start();
+    Serial.println("This never happens");
   }
-  BLETX();  
+
+  sprintf(TxString, "BP:%d,%d", battpcnt, (battpcnt * BattFullTime) / 100);
+  BLETX();
   //
 }
 
@@ -374,4 +364,3 @@ void MorseChar(int cwChar) {
 
   } else Serial.printf("character %d not recognized\n", cwChar);
 }
-
