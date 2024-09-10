@@ -10,7 +10,7 @@ void RxStringParse(void){
       scale.power_down();
       MorseChar(SHAVE_HAIRCUT);
       pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));
-      pixels.show();  // Send the updated pixel colors to the hardware.
+      pixels.show();  // Send the updated pixel colors to the image.pngimage.pnghardware.
       Serial.printf("******Going to Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
       esp_deep_sleep_enable_gpio_wakeup(1 << StartButton, ESP_GPIO_WAKEUP_GPIO_LOW);
       esp_deep_sleep_start(); 
@@ -62,13 +62,15 @@ void BLEReconnect(void) {
     delay(10);                    // give the bluetooth stack the chance to get things ready
     pServer->startAdvertising();  // restart advertising
     Serial.println(" in loop reconnect ;start advertising");
+    setLED(250,clrs.BLUE);
     oldDeviceConnected = deviceConnected;
   }
   // connecting
   if (deviceConnected && !oldDeviceConnected) {
     Serial.println(" setting old device; This should happen once");
-    pixels.setPixelColor(LEDSelect, pixels.Color(clrs.BLUE[0], clrs.BLUE[1], clrs.BLUE[2]));
-    pixels.show();  // Send the updated pixel colors to the hardware.
+    // pixels.setPixelColor(LEDSelect, pixels.Color(clrs.BLUE[0], clrs.BLUE[1], clrs.BLUE[2]));
+    // pixels.show();  // Send the updated pixel colors to the hardware.
+    setLED(0,clrs.BLUE);
     // do stuff here on connecting
     oldDeviceConnected = deviceConnected;
   }
@@ -98,99 +100,130 @@ void FindCalibration() {    //never checked out.
   }
 }
 
-
+int floatcomp(const void* elem1, const void* elem2)
+{
+    if(*(const float*)elem1 < *(const float*)elem2)
+        return -1;
+    return *(const float*)elem1 > *(const float*)elem2;
+}
 
 void CheckForce(void) { //PGT1 changed
-
+  int i = 0; //force array index
+  int arraysz = sizeof(Force.ForceArray)/sizeof(Force.ForceArray[0]);
   if (scale.is_ready()) {  //.get_units is blocking.
     scaleVal = scale.get_units(scaleSamples);
-    sprintf(TxString, "HF:%.1f", scaleVal);
+    for (i = (arraysz-1); i >0; i--){
+      Force.ForceArray[i]= Force.ForceArray[i-1];   //move everything up one spot
+    }
+    Force.ForceArray[0] = scaleVal;
+    //now find max, min, mean
+    Force.ForceMax = scaleVal;   
+    Force.ForceMin = scaleVal;
+    Force.ForceMean = 0;
+    for (i=0; i<arraysz; i++){
+      // Serial.printf("%.3f ",Force.ForceArray[i]);
+      if (Force.ForceArray[i]>Force.ForceMax) Force.ForceMax=Force.ForceArray[i];
+      if (Force.ForceArray[i]<Force.ForceMin) Force.ForceMin=Force.ForceArray[i];
+      Force.ForceMean += Force.ForceArray[i];      
+    }
+    // Serial.printf("\nForceMeanR = %.3f, \tArray len = %d\n", Force.ForceMean, arraysz);
+    Force.ForceMean= Force.ForceMean/arraysz;
+    float wkarray[FORCE_ARRAY_LEN];    //temp array for sorting
+    // Serial.printf("Force = %.3f\n", scaleVal);
+    // Serial.printf("unsorted\t");
+    // for(i = 0; i < 10; i++)
+    //  Serial.printf("%.3f\t", Force.ForceArray[i]);
+    // Serial.printf("\n");   
+
+    for (i=0;i<arraysz; i++) wkarray[i]=Force.ForceArray[i];
+    qsort(wkarray, arraysz, sizeof(float), floatcomp);
+  //   Serial.printf("  sorted\t");
+  //  for(i = 0; i < 10; i++)
+  //     Serial.printf("%.3f\t", wkarray[i]);
+  //  Serial.printf("\n");   
+   if (arraysz %2 ==0) Force.ForceMedian = (wkarray[arraysz/2] +wkarray[arraysz/2 + 1])/2;
+   else Force.ForceMedian = wkarray[arraysz/2 + 1];
+   //Serial.printf("median = %.4f\n\n", Force.ForceMedian);
+   
+
+
+    // Serial.printf("ForceMeanA = %.3f, \tArray len = %d\n", Force.ForceMean,arraysz);
+    // Serial.printf("\tHF= %.3f\t",scaleVal);
+    // Serial.printf("Mean= %.3f\t",Force.ForceMean);
+    // Serial.printf("Max= %.3f\t", Force.ForceMax);
+    // Serial.printf("Min= %.3f\t", Force.ForceMin);
+    // Serial.printf("Delta = %.3f\n", (Force.ForceMax-Force.ForceMin));
+
+    sprintf(TxString, "HF:%.3f", scaleVal);
     BLETX();  //transmits TxString
+    
   }
 }
 
+void VibSend() {
+  
+  sprintf(TxString, "MX:%.3f,%.3f", Force.ForceMax, Force.ForceMin);
+  BLETX();
+  sprintf(TxString, "MN:%.3f,%.3f", Force.ForceMean, Force.ForceMedian);
+  BLETX();
+}
 
-// void click(Button2& btn) {
-//   //Serial.println("click--pause/unpause");
-//   //do restore
-//   if (sqstate == sqPause) {
-//     oldmillis = millis() - pause_el_time;
-//     sqstate = paused_State;
-//     BLETX("V:Resuming");
-//     Serial.printf("Un pausing....\n");
-//     MorseChar('o');
+void setLED(int btime, int clrarray[3]) {  //incorporate into LEDBlink                                                    
+  int i = 0;
+  BlinkTime = btime;
+  for (i = 0; i < 3; i++) {
+    //Serial.printf("i = %d; clr = %d\t", i, clrarray[i] );
+    clrs.WKCLRS[i] = clrarray[i];
+  }
+  Serial.printf("\n");
+  //LEDSelect = LedNo;
+}
 
-//   } else {
-//     //do store & got to sqState
-//     Serial.printf("Pausing....\n");
-//     BLETX("V:Pausing");
-//     MorseChar('5');
-//     pause_el_time = el_time;  //el_time can be used in sqPause
-//     paused_State = sqstate;
-//     sqstate = sqPause;
-//     oldmillis = millis();
-//   }
-// }
-// void longClickDetected(Button2& btn) {
-//   Serial.println("long click detected; go to sleep");
-//   MorseChar('5');
-//   MorseChar('5');
-//   BLETX("V:Goodbye");
-//   //newseqstate(WRAPUP, HI_LOW_LED, 0, clrs.OFF);  //resets oldmillis
-// }
-// void longClick(Button2& btn) {
-//   Serial.println("long click\n");
-// }
-
-// void initVals(void) {
-
-//   for (hand_num = 0; hand_num < 2; hand_num++) {
-//     //zero out app display
-//     hands[hand_num].MVE_MAX = 0;
-//     BLETX("MF:%d:R:%.1f", hand_num, 0, hands[hand_num].MVE_MAX);  //zero out max
-//     hands[hand_num].HOLDTgt = 0;
-//     BLETX("TF:%d:R:%.1f", hand_num, 0, hands[hand_num].HOLDTgt);  //zero out hold tgt
-//     hands[hand_num].HOLDMin = 0;
-//     BLETX("LL:%d:R:%.1f", hand_num, 0, hands[hand_num].HOLDMin);
-//     hands[hand_num].HOLDMax = 0;
-//     BLETX("HL:%d:R:%.1f", hand_num, 0, hands[hand_num].HOLDMax);
-//     BLETX("HF:%d:0:%.1f", hand_num, 0, 0.0);  //make hold force go to zero
-//     hands[hand_num].ON_TGT_PCNT = 0;
-//     BLETX("TP:%d:G:%.1f", hand_num, 0, hands[hand_num].ON_TGT_PCNT);
-//     hands[hand_num].HI_PCNT = 0;
-//     BLETX("HP:%d:G:%.1f", hand_num, 0, hands[hand_num].HI_PCNT);
-//     hands[hand_num].LO_PCNT = 0;
-//     BLETX("LP:%d:G:%.1f", hand_num, 0, hands[hand_num].LO_PCNT);
-//     //zero out stats
-//     hands[hand_num].ON_TGT_HITS = 0;
-//     hands[hand_num].HI_HITS = 0;
-//     hands[hand_num].LO_HITS = 0;
-//     hands[hand_num].TOT_HITS = 0;
-//   }
-// }
-
-void LEDBlink(void) {   //PGT1 Revised
+void LEDBlink() {
   static u_long lclmillis = 0;
-  static bool ON_OFF = true;  //true = ON??
+  static bool ON_OFF = true;
 
   if (BlinkTime > 0) {
     if (((millis() - lclmillis) > BlinkTime) && ON_OFF) {
-      if (UseRedLED) digitalWrite(LEDRED, HIGH);
-      if (UseBlueLED) digitalWrite(LEDBLUE, HIGH);
+      pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));
+      pixels.show();  // Send the updated pixel colors to the hardware.
       ON_OFF = false;
       lclmillis = millis();
 
     } else if (((millis() - lclmillis) > BlinkTime) && !ON_OFF) {
-      if (UseRedLED) digitalWrite(LEDRED, LOW);
-      if (UseBlueLED) digitalWrite(LEDBLUE, LOW);
+      pixels.setPixelColor(LEDSelect, clrs.WKCLRS[0], clrs.WKCLRS[1], clrs.WKCLRS[2]);
+      pixels.show();
       ON_OFF = true;
       lclmillis = millis();
     }
   } else {
-    if (UseRedLED) digitalWrite(LEDRED, HIGH);
-    if (UseBlueLED) digitalWrite(LEDBLUE, HIGH);
+    pixels.setPixelColor(LEDSelect, clrs.WKCLRS[0], clrs.WKCLRS[1], clrs.WKCLRS[2]);
   }  //0 blink time is on solid
+  pixels.show();
 }
+
+// void LEDBlink(void) {   //PGT1 Revised
+//   static u_long lclmillis = 0;
+//   static bool ON_OFF = true;  //true = ON??
+
+//   if (BlinkTime > 0) {
+//     if (((millis() - lclmillis) > BlinkTime) && ON_OFF) {
+//       if (UseRedLED) digitalWrite(LEDRED, HIGH);
+//       if (UseBlueLED) digitalWrite(LEDBLUE, HIGH);
+//       ON_OFF = false;
+//       lclmillis = millis();
+
+//     } else if (((millis() - lclmillis) > BlinkTime) && !ON_OFF) {
+//       if (UseRedLED) digitalWrite(LEDRED, LOW);
+//       if (UseBlueLED) digitalWrite(LEDBLUE, LOW);
+//       ON_OFF = true;
+//       lclmillis = millis();
+//     }
+//   } else {
+//     if (UseRedLED) digitalWrite(LEDRED, HIGH);
+//     if (UseBlueLED) digitalWrite(LEDBLUE, HIGH);
+//   }  //0 blink time is on solid
+// }
 
 void BLETX(void) {
 
@@ -243,7 +276,7 @@ void BatSnsCk(void) {
   //float battvolts = 0.0;
   battrdg = analogRead(BatSns);
   battvolts = ((float)battrdg * 2 * 3.2 * 210 / 310) / 4095;  //fudge; something wrong with voltage divider--impedance too high--r11 = 210k? WTF??
-  //Serial.printf("******Battery: Raw = %d;  volts = %.2f****** \n", battrdg, battvolts);
+  Serial.printf("******Battery: Raw = %d;  volts = %.2f****** \n", battrdg, battvolts);
   sprintf(TxString, "E:%.2f", battvolts);
   if (battvolts <= Batt_LO_Lvl) {
     UseRedLED = true;
@@ -252,9 +285,7 @@ void BatSnsCk(void) {
     UseBlueLED = true;
     UseRedLED = false;
   }
-
-  BLETX();
-  
+  BLETX();  
   //
 }
 
@@ -343,17 +374,4 @@ void MorseChar(int cwChar) {
 
   } else Serial.printf("character %d not recognized\n", cwChar);
 }
-// void WrapupTX(void) {
-//   int i = 0;
-//   for (i = 0; i < 2; i++) {
-//     if (i == 0) BLETX("V:Right Percent");
-//     else BLETX("V:Left Percent");
-//     delay(1000);
-//     BLETX("V:On Target %.1f", 0, 0, hands[i].ON_TGT_PCNT);
-//     delay(1000);
-//     BLETX("V:Low %.1f", 0, 0, hands[i].LO_PCNT);
-//     delay(1000);  //need to add in delay time to bletx?
-//     BLETX("V:High %.1f", 0, 0, hands[i].HI_PCNT);
-//     delay(1000);  //need to add in delay time to bletx?
-//   }
-// }
+

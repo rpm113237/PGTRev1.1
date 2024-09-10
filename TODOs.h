@@ -47,6 +47,9 @@ void HX711::power_down()
   delayMicroseconds(64);
 }
 
+Thge LED blinking code is messy.  LedSelect no longer relevant--only one LED.  Combine LEDSelect into LEDBlink.  Messey
+
+***The BLE initial connect and the in loop reconnect seem redundant and awkward.
 
 
 

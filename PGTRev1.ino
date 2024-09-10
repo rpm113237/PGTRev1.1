@@ -20,9 +20,12 @@ static const BaseType_t app_cpu = 1;
 //the c3 seems to run on 0 regardless of where it is set.
 
 
-// define ledticker, battchecker
+// define ledticker, battchecker, vibReport--have to have protos in .h
 TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);  //calls LEDBlink, called every 10MS, repeats forever, resolution MS
-TickTwo BattChecker(BatSnsCk, Batt_CK_Interval, 0, MILLIS);
+
+TickTwo VibReport(VibSend,VIB_SND_INTERVAL, 0, MILLIS);   //send vibration data every VIB_SND_INTERVAL (ms), forever
+
+TickTwo BattChecker(BatSnsCk, Batt_CK_Interval, 0, MILLIS);  //checks battery every Batt_Ck_Interval
 
 
 //construct Button2
@@ -45,7 +48,6 @@ std::string rxValue{};  // so can process outside of callback; maybe not the bes
 #define CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_TX "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
-
 // #define SERVICE_UUID "b56340e0-38a7-11ee-be56-0242ac120002"  // Custom UUID's.  nrfconnect and lightblue require Nordic's UART UUID
 // #define CHARACTERISTIC_UUID_RX "b5634374-38a7-11ee-be56-0242ac120002" // to display strings.
 // #define CHARACTERISTIC_UUID_TX "b56344a0-38a7-11ee-be56-0242ac120002"
@@ -64,6 +66,9 @@ class MyServerCallbacks : public BLEServerCallbacks {
   void onDisconnect(BLEServer* pServer) {
     deviceConnected = false;
     Serial.println("Device Disconnected!!");
+    pixels.setPixelColor(LEDSelect, pixels.Color(clrs.RED[0], clrs.RED[1], clrs.RED[2]));
+    pixels.show();  // Send the updated pixel colors to the hardware.
+    
   }
   /***************** New - Security handled here ********************
   ****** Note: these are the same return values as defaults ********/
@@ -87,17 +92,7 @@ class MyServerCallbacks : public BLEServerCallbacks {
 class MyCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) {
     rxValue = pCharacteristic->getValue();
-    // if (rxValue.length() > 0) {
-    //   //Serial.println("*********");
-    //   Serial.print("Received Value: ");
-    //   for (int i = 0; i < rxValue.length(); i++)
-    //     Serial.print(rxValue[i]);
-
-    //    Serial.println();
-    //   // Serial.println("*********");
-    // }
-    // Serial.printf("lenght of rxValue = %d\n", rxValue.length());      
-
+    
   }
 };
 
@@ -114,13 +109,7 @@ void setup() {
   
   print_wakeup_reason();
   Soundwakeup();  //wake up feedback
-
-  //set up button handler.  Only needed if PGT initiated shutdown
-  // button.begin(StartButton);
-  // button.setLongClickTime(LongClickTime);
-  // button.setLongClickDetectedHandler(longClickDetected);   
-  // button.setLongClickDetectedRetriggerable(false);  // don't call the long click handler more than once  
-
+  
   //set up LED's
   pinMode(LEDRED, OUTPUT);
   pinMode(LEDBLUE, OUTPUT);
@@ -129,6 +118,7 @@ void setup() {
   //start the TickTwo timers
   LEDtimer.start();     //start LED timer
   BattChecker.start();  //start Batt checker
+  VibReport.start();    //start Vib report
 
   // Create the BLE Device
   BLEDevice::init("Squeezer");
@@ -179,18 +169,20 @@ void setup() {
 
   oldmillis = millis();
   el_time = millis() - oldmillis;
-  //setLED(CHG_CONNECT_LED, 500, clrs.BLUE);
-  pixels.setPixelColor(LEDSelect, pixels.Color(clrs.RED[0], clrs.RED[1], clrs.RED[2]));
-  pixels.show();  // Send the updated pixel colors to the hardware.
+  setLED(500, clrs.BLUE);
+  // pixels.setPixelColor(LEDSelect, pixels.Color(clrs.RED[0], clrs.RED[1], clrs.RED[2]));
+  // pixels.show();  // Send the updated pixel colors to the hardware.
 
   Serial.print("Connecting (BLE)\n");
   BlinkTime = CNCT_LED_BLINK_TIME;
+  setLED(250, clrs.BLUE);
   BatSnsCk(); //sets color for connect led  
   while (!deviceConnected && (el_time < CONN_WAIT_TM)) {
     if ((el_time % 1000) <= 10){
        Serial.print(".");
        //pServer->startAdvertising();  // restart advertising
     }
+    //setLED(0, clrs.BLUE);
     LEDBlink();  //has to be called, since timer isn't being called?? or call timer?
     delay(10);
     el_time = millis() - oldmillis;
@@ -201,9 +193,10 @@ void setup() {
     // newseqstate(START, CHG_CONNECT_LED, 0, clrs.OFF);
   } else {
     Serial.printf("****end of setup; BLE connected****\n");
-    pixels.setPixelColor(LEDSelect, pixels.Color(clrs.BLUE[0], clrs.BLUE[1], clrs.BLUE[2]));
-    pixels.show();  // Send the updated pixel colors to the hardware.
-    BlinkTime = 0;
+    setLED(0, clrs.BLUE);   //for ledBlink
+    // pixels.setPixelColor(LEDSelect, pixels.Color(clrs.BLUE[0], clrs.BLUE[1], clrs.BLUE[2]));
+    // pixels.show();  // Send the updated pixel colors to the hardware.
+    // BlinkTime = 0;
         
   }
   // initVals();
@@ -215,10 +208,13 @@ void loop() {
   
   BattChecker.update();  // BatSnsCk checks battery, sends voltage
   LEDtimer.update();     //should call the ledBlink every 10ms.
+  VibReport.update();
   RxStringParse();
   //button.loop();    // what for?? do we want device turn off?
   BLEReconnect();   //TODO does this work???
   CheckForce();     //check force does the sending.  
+  //VibSend();
+  //  above commented out for battery test
   //delay(1000);
  
   

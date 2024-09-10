@@ -9,7 +9,8 @@
 #define CONN_WAIT_TM 10 * MS_TO_SEC //time to wait to connect 
 #define SHAVE_HAIRCUT 0x1b  //use esc for shave and haircut
 
-RTC_DATA_ATTR int bootCount = 0;                                    //keep track of how many times since power on
+RTC_DATA_ATTR int bootCount = 0;   //keep track of how many times since power on
+
 
 unsigned long oldmillis;  //to time the states
 unsigned long int el_time = 0;  //elapsed time
@@ -24,6 +25,19 @@ const int HX711_dout = 7;  //mcu > HX711 dout pin
 const int HX711_sck = 3;   //mcu > HX711 sck pin
 // const int scaleSamples = 10;
 const int scaleSamples = 2;
+#define FORCE_ARRAY_SECS 2      //how many seconds long is the force array?
+#define FORCE_ARRAY_LEN FORCE_ARRAY_SECS*10/scaleSamples //The constant 10 will need redefined if 80 sps is implemented
+struct ForceRecord {
+  float ForceArray[FORCE_ARRAY_LEN];   
+  float ForceMax;
+  float ForceMin;
+  float ForceMedian;
+  float ForceMean;
+  float ForceACRMS;
+  float ForceFundFreq;
+
+} Force;
+const int VIB_SND_INTERVAL = 1000;  //ms
 
 int ditTime = 100, chSpTime = 300;  //dit and dah
 u_long cwFreq = 2500;
@@ -71,11 +85,9 @@ long int scaleRead = 0;
 
 //protos
 void setLED(int LedNo, int btime, int clrarray[]);
-//void newseqstate(SqueezerState newst, int ledno, int ledblink, int ledclr[]);  // change states
+void VibSend(void);
 void BLETX(void);
-//void BLETX(void);
 void LEDBlink(void);
-//void ldSimLD(float ldTGT, float ldMAX, float ldMIN, float ldPCNT);
 void BatSnsCk(void);
 void SoundBuzz(u_long cwFreq = 2500, int sound_ms = 100);
 
