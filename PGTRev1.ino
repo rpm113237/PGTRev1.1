@@ -11,6 +11,17 @@
 #endif
 //I think EEPROM.h installed by default
 
+//OTA includes--taken from ElegantOTA demo example
+#include <WiFi.h>
+  #include <WiFiClient.h>
+  #include <WebServer.h>
+  #include <ElegantOTA.h>
+   WebServer server(80);
+
+const char* ssid = "McClellan_Workshop";
+const char* password = "Rangeland1";
+
+
 // if it is the C3 or other single core ESP32" Use core 0
 #if CONFIG_FREERTOS_UNICORE
 static const BaseType_t app_cpu = 0;
@@ -104,6 +115,31 @@ void setup() {
   //int i = 0; // old FORTRAN programmers never die
   Serial.begin(115200);
   Serial.printf("\nHello from Protocol Grip Trainer v25Jul24\n");
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  Serial.println("Hello World OTA");
+
+  // Wait for connection
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.print("Connected to ");
+  Serial.println(ssid);
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", []() {
+    server.send(200, "text/plain", "Hello from PGT Rev1 ElegantOTA!!!");
+  });
+
+  ElegantOTA.begin(&server);    // Start ElegantOTA
+  server.begin();
+  Serial.println("HTTP server started");
+
+
 
   ledcAttach(buzzPin, freq, resolution);   //eight bit resolution--why? (Jun24?); using for PWM
   
@@ -205,6 +241,9 @@ void setup() {
 }
 
 void loop() {
+
+   server.handleClient();
+  ElegantOTA.loop();
   
   BattChecker.update();  // BatSnsCk checks battery, sends voltage
   LEDtimer.update();     //should call the ledBlink every 10ms.
