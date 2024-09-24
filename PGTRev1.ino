@@ -11,6 +11,9 @@
 #endif
 //I think EEPROM.h installed by default
 
+//ADC calibration
+// #include <esp_adc_cal.h>
+
 //OTA includes--taken from ElegantOTA demo example
 #include <WiFi.h>
   #include <WiFiClient.h>
