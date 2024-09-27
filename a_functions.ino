@@ -1,7 +1,7 @@
 void RxStringParse(void) {
   //Serial.printf("length of rxValue in RxParseString = %d\n", rxValue.length());
   String tagStr, valStr;  //C:12.3; C is tag, 12.3 is val
-  float FloatVal = 4.2;   //valStr converted to float 4.2 is +/-charge voltage
+  //float FloatVal = 4.2;   //valStr converted to float 4.2 is +/-charge voltage
   if ((digitalRead(StartButton) == LOW)) {
     Serial.printf("Start button is LOW\n");
     GoToSleep();
@@ -57,21 +57,34 @@ void RxStringParse(void) {
     rxValue.clear();  //erases
   }
 }
-void CalibrateADC(String strval){  //TODO pass string, do float converstion in procedure
-  float batactual = strval.toFloat();
-  float adcavg=0;
-  int i;
-  int numrdgs = 10;
-  int adcrdg;
-  for (i=1; i<=numrdgs; i++){    //find out how much noise
-  adcrdg = (float)analogRead(BatSns);  
-  Serial.printf("instantaneous adc rdg = %d\n", adcrdg);
-  adcavg = (float) adcrdg+adcavg;
+float getFloatADC(int numtimes){
+  float adcavg = 0.0;
+  int i;    //old FORTRAN pgmr
+  for (i=1; i<=numtimes; i++ ){
+    adcavg = adcavg + (float)analogRead(BatSns);
   }
-  adcavg = adcavg/10;
-  Serial.printf("Calibrate ADC, adcaverage = %f over %d rdgs\n",adcavg,numrdgs);
-  BatSnsFactor = batactual/adcavg;  // replace with  calc floatval
+  return adcavg/numtimes;
+
+}
+
+void CalibrateADC(String strval){  //TODO pass string, do float converstion in procedure
+  float BatCalValue = strval.toFloat();
+  int numrdgs = 10;   //probably needs to be in squeezer.h
+  // float adcavg=0;
+  // int i;
+  // int numrdgs = 10;
+  // int adcrdg;
+  // for (i=1; i<=numrdgs; i++){    //find out how much noise
+  // adcrdg = (float)analogRead(BatSns);  
+  // Serial.printf("instantaneous adc rdg = %d\n", adcrdg);
+  // adcavg = (float) adcrdg+adcavg;
+  // }
+  // adcavg = adcavg/10;
+  float adcrdg = getFloatADC(numrdgs);
+  Serial.printf("Calibrate ADC, adcaverage = %f over %d rdgs\n",adcrdg,numrdgs);
+  BatSnsFactor = BatCalValue/adcrdg;  // l
   Serial.printf ("BatSns factor = %f\n",BatSnsFactor);
+  prefs.putFloat("BatADCScale", BatSnsFactor);
   //TODO 
 }
 void SetSSID(void) {
@@ -323,10 +336,15 @@ void print_wakeup_reason() {
 
 void BatSnsCk(void) {
   //reads the ADC on BatSns
+  float battmult =0;
   int battpcnt;
   int battvoltx100 = 0;  //batt volts *100, rounded to int
   int battrdg = 0;       //raw
-  battrdg = analogRead(BatSns);
+  battmult = prefs.getFloat("BatADCScale");
+  //battrdg = analogRead(BatSns);
+  battvolts = getFloatADC(10)*battmult;
+  Serial.printf("batt mult = %f, batt volts = %f\n", battmult, battvolts);
+  while (1);
   //battvolts = ((float)battrdg * 2 * 3.2 * 210 / 310) / 4095;  //fudge; something wrong with voltage divider--impedance too high--r11 = 210k? WTF??
   battvolts = ((float)battrdg / 955);  //fudge for now; later do a calibration routine
   Serial.printf("******Battery: Raw = %d;  volts = %.2f****** \n", battrdg, battvolts);

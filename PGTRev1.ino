@@ -14,6 +14,10 @@
 //ADC calibration
 // #include <esp_adc_cal.h>
 
+#include <Preferences.h>
+Preferences prefs;
+
+
 //OTA includes--taken from ElegantOTA demo example
 #include <WiFi.h>
 #include <WiFiClient.h>
@@ -166,8 +170,8 @@ void setup() {
   pServer->getAdvertising()->start();
    Serial.printf("BLE advertising time = %lu ms\n", (millis()-lagmsStart));  
 
-  //Serial.println("Waiting a client connection to notify...");
-  //pinMode(StartButton, INPUT);  // Right now, used only to wake up out of deep sleep--done in Button2??
+  //set up flash
+  prefs.begin("BatADCScale");   //multiply adc float by this to get voltage
 
   //set up the scale
 

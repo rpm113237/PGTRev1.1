@@ -73,7 +73,7 @@ float battvolts = 0.0;
 float Batt_HI_Lvl = 3.6;
 float Batt_OK_Lvl = 3.5;
 float Batt_LO_Lvl = 3.3;
-float BatSnsFactor = 0.001151;
+float BatSnsFactor = 0.0010040;  //TODO -find the nominal value
 
 const int Batt_CK_Interval = 60 * MS_TO_SEC;
 #define Battmah 1000
@@ -101,6 +101,7 @@ void SetPwd(void);
 void DoOTA(void);
 void CalibrateScale(void);
 void DoTare(void);
+float getFloatADC(int numtimes);
 
 
 #endif
