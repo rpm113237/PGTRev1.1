@@ -1,6 +1,9 @@
 void RxStringParse(void) {
   //Serial.printf("length of rxValue in RxParseString = %d\n", rxValue.length());
-  if ((digitalRead(StartButton) == LOW)) Serial.printf("Start button is LOW\n");
+  if ((digitalRead(StartButton) == LOW)) {
+    Serial.printf("Start button is LOW\n");
+    GoToSleep();
+    }
   // else Serial.printf("Start button is HIGH\n");
   if ((rxValue.length() > 0) || (digitalRead(StartButton) == LOW)) {  //awkward, do we need to check length?
     Serial.printf("rxValue %s\n", rxValue.c_str());
@@ -45,6 +48,31 @@ void RxStringParse(void) {
     }
     rxValue.clear();  //erases
   }
+}
+
+void ConnectWiFi(void) {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  Serial.println("Hello World OTA");
+
+  // Wait for connection
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.print("Connected to ");
+  Serial.println(ssid);
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", []() {
+    server.send(200, "text/plain", "Hello from PGT Rev1 ElegantOTA!!!");
+  });
+
+  ElegantOTA.begin(&server);  // Start ElegantOTA
+  server.begin();
+  Serial.println("HTTP server started");
 }
 
 
@@ -112,15 +140,15 @@ void CheckForce(void) {  //PGT1 changed
     Force.ForceMax = scaleVal;
     Force.ForceMin = scaleVal;
     Force.ForceMean = 0;
-    for (i = 0; i < arraysz; i++) {      
+    for (i = 0; i < arraysz; i++) {
       if (Force.ForceArray[i] > Force.ForceMax) Force.ForceMax = Force.ForceArray[i];
       if (Force.ForceArray[i] < Force.ForceMin) Force.ForceMin = Force.ForceArray[i];
       Force.ForceMean += Force.ForceArray[i];
     }
-    
+
     Force.ForceMean = Force.ForceMean / arraysz;
     float wkarray[FORCE_ARRAY_LEN];  //temp array for sorting
-    
+
     for (i = 0; i < arraysz; i++) wkarray[i] = Force.ForceArray[i];
     qsort(wkarray, arraysz, sizeof(float), floatcomp);
     //   Serial.printf("  sorted\t");
@@ -129,22 +157,23 @@ void CheckForce(void) {  //PGT1 changed
     //  Serial.printf("\n");
     if (arraysz % 2 == 0) Force.ForceMedian = (wkarray[arraysz / 2] + wkarray[arraysz / 2 + 1]) / 2;
     else Force.ForceMedian = wkarray[arraysz / 2 + 1];
-    
+
     clrTxString();
     sprintf(TxString, "HF:%.1f", scaleVal);
     BLETX();  //transmits TxString
   }
 }
 
-void clrTxString(void){
-  int i; int Txsize;
-  Txsize = sizeof(TxString)/sizeof(TxString[0]);
-  for (i=0; i<Txsize; i++)TxString[i]=0x00;  //needs cleared for some reason.
+void clrTxString(void) {
+  int i;
+  int Txsize;
+  Txsize = sizeof(TxString) / sizeof(TxString[0]);
+  for (i = 0; i < Txsize; i++) TxString[i] = 0x00;  //needs cleared for some reason.
 }
 
 void VibSend() {
   clrTxString();
-  sprintf(TxString, "M:%.1f,%.1f,%.1f", Force.ForceMax, Force.ForceMin,Force.ForceMean);
+  sprintf(TxString, "M:%.1f,%.1f,%.1f", Force.ForceMax, Force.ForceMin, Force.ForceMean);
   BLETX();
   // clrTxString();
   // sprintf(TxString, "MN:%.3f,%.3f", Force.ForceMean, Force.ForceMedian);
@@ -225,7 +254,7 @@ void print_wakeup_reason() {
       Serial.println("Wakeup caused by ULP program");
       break;
     default:
-      Serial.printf("Wakeup was not caused by deep sleep: %d\n", wakeup_reason);
+      Serial.printf("Wakeup was not caused by deep sleep; reason code = %d\n", wakeup_reason);
       break;
   }
 }
@@ -247,7 +276,7 @@ void BatSnsCk(void) {
   int battrdg = 0;       //raw
   battrdg = analogRead(BatSns);
   //battvolts = ((float)battrdg * 2 * 3.2 * 210 / 310) / 4095;  //fudge; something wrong with voltage divider--impedance too high--r11 = 210k? WTF??
-  battvolts = ((float)battrdg/955);  //fudge for now; later do a calibration routine
+  battvolts = ((float)battrdg / 955);  //fudge for now; later do a calibration routine
   Serial.printf("******Battery: Raw = %d;  volts = %.2f****** \n", battrdg, battvolts);
   //sprintf(TxString, "E:%.2f", battvolts);
   //reference: https://blog.ampow.com/lipo-voltage-chart/
@@ -275,17 +304,20 @@ void BatSnsCk(void) {
 
   if (battvoltx100 < 371) UseRedLED = true;
   if (battvoltx100 < 3.5) {
-    scale.power_down();
-    MorseChar(SHAVE_HAIRCUT);
-    Serial.printf("******Low Battery Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
-    esp_deep_sleep_enable_gpio_wakeup(1 << StartButton, ESP_GPIO_WAKEUP_GPIO_LOW);
-    esp_deep_sleep_start();
-    Serial.println("This never happens");
+    GoToSleep();
   }
-
   sprintf(TxString, "BP:%d,%d", battpcnt, (battpcnt * BattFullTime) / 100);
   BLETX();
   //
+}
+
+void GoToSleep(void) {
+  scale.power_down();
+  MorseChar(SHAVE_HAIRCUT);
+  Serial.printf("******Low Battery Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
+  esp_deep_sleep_enable_gpio_wakeup(1 << StartButton, ESP_GPIO_WAKEUP_GPIO_LOW);
+  esp_deep_sleep_start();
+  Serial.println("This never happens");
 }
 
 void SoundBuzz(u_long cwFreq, int sound_ms) {

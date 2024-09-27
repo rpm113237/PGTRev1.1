@@ -4,11 +4,11 @@
 //#include <EasyNeoPixels.h>  //TODO change over to underlying adafruit library
 #include "Squeezer.h"
 //#include <Adafruit_NeoPixel.h>
-#include <Button2.h>
+//#include <Button2.h>
 #include <HX711.h>  //this is non blocking.  hope it works
-#if defined(ESP8266) || defined(ESP32) || defined(AVR)
-#include <EEPROM.h>
-#endif
+// #if defined(ESP8266) || defined(ESP32) || defined(AVR)
+// #include <EEPROM.h>
+// #endif
 //I think EEPROM.h installed by default
 
 //ADC calibration
@@ -16,10 +16,10 @@
 
 //OTA includes--taken from ElegantOTA demo example
 #include <WiFi.h>
-  #include <WiFiClient.h>
-  #include <WebServer.h>
-  #include <ElegantOTA.h>
-   WebServer server(80);
+#include <WiFiClient.h>
+#include <WebServer.h>
+#include <ElegantOTA.h>
+WebServer server(80);
 
 const char* ssid = "McClellan_Workshop";
 const char* password = "Rangeland1";
@@ -37,7 +37,7 @@ static const BaseType_t app_cpu = 1;
 // define ledticker, battchecker, vibReport--have to have protos in .h
 TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);  //calls LEDBlink, called every 10MS, repeats forever, resolution MS
 
-TickTwo VibReport(VibSend,VIB_SND_INTERVAL, 0, MILLIS);   //send vibration data every VIB_SND_INTERVAL (ms), forever
+TickTwo VibReport(VibSend, VIB_SND_INTERVAL, 0, MILLIS);  //send vibration data every VIB_SND_INTERVAL (ms), forever
 
 TickTwo BattChecker(BatSnsCk, Batt_CK_Interval, 0, MILLIS);  //checks battery every Batt_Ck_Interval
 
@@ -82,7 +82,6 @@ class MyServerCallbacks : public BLEServerCallbacks {
     Serial.println("Device Disconnected!!");
     pixels.setPixelColor(LEDSelect, pixels.Color(clrs.RED[0], clrs.RED[1], clrs.RED[2]));
     pixels.show();  // Send the updated pixel colors to the hardware.
-    
   }
   /***************** New - Security handled here ********************
   ****** Note: these are the same return values as defaults ********/
@@ -106,7 +105,6 @@ class MyServerCallbacks : public BLEServerCallbacks {
 class MyCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* pCharacteristic) {
     rxValue = pCharacteristic->getValue();
-    
   }
 };
 
@@ -115,43 +113,20 @@ HX711 scale;
 // the setup function runs once when you press reset or power the board
 void setup() {
   // initialize serial communication at 115200 bits per second:
-  //int i = 0; // old FORTRAN programmers never die
+  u_long lagmsStart = millis();
   Serial.begin(115200);
-  Serial.printf("\nHello from Protocol Grip Trainer v25Jul24\n");
+  Serial.printf("\nHello from Protocol Grip Trainer v25Jul24, time = \t%lu ms\n", (millis()-lagmsStart));  
 
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.println("Hello World OTA");
-
-  // Wait for connection
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(ssid);
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-
-  server.on("/", []() {
-    server.send(200, "text/plain", "Hello from PGT Rev1 ElegantOTA!!!");
-  });
-
-  ElegantOTA.begin(&server);    // Start ElegantOTA
-  server.begin();
-  Serial.println("HTTP server started");
-
-
-
-  ledcAttach(buzzPin, freq, resolution);   //eight bit resolution--why? (Jun24?); using for PWM
-  
+  ledcAttach(buzzPin, freq, resolution);  //eight bit resolution--why? (Jun24?); using for PWM
+  setLED(00, clrs.GREEN);
+  LEDBlink(); //Give them a green.
   print_wakeup_reason();
   Soundwakeup();  //wake up feedback
-  
+  Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));  
+
   //set up LED's
-  pinMode(LEDRED, OUTPUT);
-  pinMode(LEDBLUE, OUTPUT);
+  // pinMode(LEDRED, OUTPUT);
+  // pinMode(LEDBLUE, OUTPUT);
   pinMode(StartButton, INPUT);
 
   //start the TickTwo timers
@@ -189,22 +164,25 @@ void setup() {
 
   // Start advertising
   pServer->getAdvertising()->start();
-  Serial.println("Waiting a client connection to notify...");
+   Serial.printf("BLE advertising time = %lu ms\n", (millis()-lagmsStart));  
+
+  //Serial.println("Waiting a client connection to notify...");
   //pinMode(StartButton, INPUT);  // Right now, used only to wake up out of deep sleep--done in Button2??
 
   //set up the scale
-  
+
   scale.begin(HX711_dout, HX711_sck);
-  scale.reset();    //if coming out of deep sleep; scale might be powered down
-  // Serial.print("read average of 20--stabilize: \t\t");
-  Serial.printf("*********Warm up read 20X; val = %.2f*********\n", scale.read_average(20));  // print the average of 20 readings from the ADC
+  scale.reset();  //if coming out of deep sleep; scale might be powered down
+  // Serial.print("read average of 10--stabilize: \t\t");
+  Serial.printf("*********Warm up read 10X; val = %.2f*********\n", scale.read_average(10));  // print the average of 10 readings from the ADC
                                                                                               //************* to stand out in log
-  scale.set_scale(9631.0);  //This value needs to be default; a cal function needs to be implemented
-  // scale.set_scale(scaleCal); 
-                                                                    // need
+  scale.set_scale(9631.0);                                                                    //This value needs to be default; a cal function needs to be implemented
+  // scale.set_scale(scaleCal);
+  // need
   // this value is obtained by calibrating the scale with known weights; see the README for details
   scale.tare();  // reset the scale to 0
 
+ Serial.printf("Scale setup and tared time = %lu ms\n", (millis()-lagmsStart));  
 
   oldmillis = millis();
   el_time = millis() - oldmillis;
@@ -215,11 +193,11 @@ void setup() {
   Serial.print("Connecting (BLE)\n");
   BlinkTime = CNCT_LED_BLINK_TIME;
   setLED(250, clrs.BLUE);
-  BatSnsCk(); //sets color for connect led  
+  BatSnsCk();  //sets color for connect led
   while (!deviceConnected && (el_time < CONN_WAIT_TM)) {
-    if ((el_time % 1000) <= 10){
-       Serial.print(".");
-       //pServer->startAdvertising();  // restart advertising
+    if ((el_time % 1000) <= 10) {
+      Serial.print(".");
+      //pServer->startAdvertising();  // restart advertising
     }
     //setLED(0, clrs.BLUE);
     LEDBlink();  //has to be called, since timer isn't being called?? or call timer?
@@ -232,32 +210,26 @@ void setup() {
     // newseqstate(START, CHG_CONNECT_LED, 0, clrs.OFF);
   } else {
     Serial.printf("****end of setup; BLE connected****\n");
-    setLED(0, clrs.BLUE);   //for ledBlink
-    // pixels.setPixelColor(LEDSelect, pixels.Color(clrs.BLUE[0], clrs.BLUE[1], clrs.BLUE[2]));
-    // pixels.show();  // Send the updated pixel colors to the hardware.
-    // BlinkTime = 0;
-        
-  }
-  // initVals();
-  // hand_num = 0;
-  //while (1);
+    setLED(0, clrs.BLUE);  //for ledBlink
+      }
+  
 }
 
 void loop() {
 
-   server.handleClient();
+  server.handleClient();
   ElegantOTA.loop();
-  
+
   BattChecker.update();  // BatSnsCk checks battery, sends voltage
   LEDtimer.update();     //should call the ledBlink every 10ms.
   VibReport.update();
   RxStringParse();
   //button.loop();    // what for?? do we want device turn off?
-  BLEReconnect();   //TODO does this work???
-  CheckForce();     //check force does the sending.  
+  BLEReconnect();  //TODO does this work???
+  CheckForce();    //check force does the sending.
   //VibSend();
   //  above commented out for battery test
   //delay(1000);
- 
-  
+
+
 }  //end of loop
