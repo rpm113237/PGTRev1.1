@@ -1,42 +1,45 @@
 void RxStringParse(void) {
   //Serial.printf("length of rxValue in RxParseString = %d\n", rxValue.length());
-  String tagStr, valStr; //C:12.3; C is tag, 12.3 is val
+  String tagStr, valStr;  //C:12.3; C is tag, 12.3 is val
+  float FloatVal = 4.2;   //valStr converted to float 4.2 is +/-charge voltage
   if ((digitalRead(StartButton) == LOW)) {
     Serial.printf("Start button is LOW\n");
     GoToSleep();
-    }
+  }
   // else Serial.printf("Start button is HIGH\n");
   if ((rxValue.length() > 0)) {  //nothing to do if len = 0
-    Serial.printf("rxValue %s\n", rxValue.c_str());
+    Serial.println("rxValue "+ rxValue);
     int indxsemi = rxValue.indexOf(':');
-    tagStr= rxValue.substring(0,(indxsemi-1));
+    Serial.printf("Index of semi colon is %d\n" , indxsemi);
+    if (indxsemi <0) indxsemi =1;   // make it work for single tags w/o semi
+    tagStr = rxValue.substring(0, indxsemi);
     tagStr.toUpperCase();
-    Serial.print("tagstring upper = "); Serial.println (tagStr);
-
-    if(tagStr=="X") Serial.printf("X is found, hooray\n");
-
-    while(1);
-
-
-    Serial.printf("rxValue[0], to upper is %c\n", toupper(rxValue[0]));
-    if ((toupper(rxValue[0]) == 'X') || (digitalRead(StartButton) == LOW)) {
-      //Serial.printf (" X found\n");
-      scale.power_down();
-      MorseChar(SHAVE_HAIRCUT);
-      pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));
-      pixels.show();  // Send the updated pixel colors to the image.pngimage.pnghardware.
-      Serial.printf("******Going to Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
-      esp_deep_sleep_enable_gpio_wakeup(1 << StartButton, ESP_GPIO_WAKEUP_GPIO_LOW);
-      esp_deep_sleep_start();
-      Serial.println("This never happens");
+    Serial.print("tagstring upper = ");
+    Serial.println(tagStr);
+    if (rxValue.length()> (indxsemi+1)){
+      Serial.println( "A value exists\n");    //leave it as a string
+      valStr = rxValue.substring((indxsemi+1), rxValue.length());
+      Serial.println("Value String = "+ valStr); 
     }
-    /*Procedure for calibration is:
+    //FloatVal = tagStr.toFloat();
+
+    if (tagStr == "X") {
+      // Serial.printf("X is found, hooray\n");
+      Serial.printf(" Tag 'X' received, Going to Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
+      GoToSleep();     
+    }
+    else if (tagStr == "V") CalibrateADC(valStr);
+    else if (tagStr == "S") SetSSID();
+    else if (tagStr == "P") SetPwd();
+    else if (tagStr == "O") DoOTA();   
+    else if (tagStr == "C") CalibrateScale();
+    else if (tagStr== "T") DoTare();    //not sure why we need this
+       /*Procedure for calibration is:
         --app sends an X for tare.  tare is done on start up, but good practice. Tare takes 20 samples--2 sec +/-
         --app sends X:NN.N.  NN.N is in lbs/kilograms Note: the calibration is actually 
         the scale calibrates, stores the calibration factor.
 
         */
-    else if (toupper(rxValue[0]) == 'C') {
       // Serial.printf(" C found, do calibration now\n");
       // std::string calstring;  //string that is weight
       // calstring = rxValue.substr(1, rxValue.length());
@@ -47,19 +50,57 @@ void RxStringParse(void) {
       //   float calcscale = scale.get_scale();
       //   Serial.printf(" calscale = %f \n", calcscale);
       // } else Serial.printf("Zero length cal value string\n");
-    } else if (toupper(rxValue[0] == 'T')) {  //tare
-      Serial.printf("***Doing tare***\n");
-      scale.tare(20);  //20X should be plenty
-      long scaleoffset = scale.get_offset();
-      Serial.printf("Tare done, offset = %ld\n", scaleoffset);
-
-
-    } else {
-      Serial.printf("Character 0 is %c \n", toupper(rxValue[0]));
+     
+     else {
+      Serial.println("Unknown Tag =" + tagStr);
     }
     rxValue.clear();  //erases
   }
 }
+void CalibrateADC(String strval){  //TODO pass string, do float converstion in procedure
+  float batactual = strval.toFloat();
+  float adcavg=0;
+  int i;
+  int numrdgs = 10;
+  int adcrdg;
+  for (i=1; i<=numrdgs; i++){    //find out how much noise
+  adcrdg = (float)analogRead(BatSns);  
+  Serial.printf("instantaneous adc rdg = %d\n", adcrdg);
+  adcavg = (float) adcrdg+adcavg;
+  }
+  adcavg = adcavg/10;
+  Serial.printf("Calibrate ADC, adcaverage = %f over %d rdgs\n",adcavg,numrdgs);
+  BatSnsFactor = batactual/adcavg;  // replace with  calc floatval
+  Serial.printf ("BatSns factor = %f\n",BatSnsFactor);
+  //TODO 
+}
+void SetSSID(void) {
+  Serial.println ("SetSSID");
+  return;
+}
+
+void SetPwd(void){
+  Serial.println("SetPWD");
+  return;
+}
+
+void DoOTA(void){
+  Serial.println ("DoOTA");
+  return;
+}
+void CalibrateScale(void){
+  Serial.println ("CalibrateS cale");
+}
+
+void DoTare(void){
+   //tare
+      Serial.printf("***Doing tare***\n");
+      scale.tare(20);  //20X should be plenty
+      long scaleoffset = scale.get_offset();
+      Serial.printf("Tare done, offset = %ld\n", scaleoffset);
+  
+}
+
 
 void ConnectWiFi(void) {
   WiFi.mode(WIFI_STA);

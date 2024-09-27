@@ -73,6 +73,8 @@ float battvolts = 0.0;
 float Batt_HI_Lvl = 3.6;
 float Batt_OK_Lvl = 3.5;
 float Batt_LO_Lvl = 3.3;
+float BatSnsFactor = 0.001151;
+
 const int Batt_CK_Interval = 60 * MS_TO_SEC;
 #define Battmah 1000
 #define Runmah  70
@@ -93,5 +95,12 @@ void BLETX(void);
 void LEDBlink(void);
 void BatSnsCk(void);
 void SoundBuzz(u_long cwFreq = 2500, int sound_ms = 100);
+void CalibrateADC(String strval);
+void SetSSID(void);
+void SetPwd(void);
+void DoOTA(void);
+void CalibrateScale(void);
+void DoTare(void);
+
 
 #endif
