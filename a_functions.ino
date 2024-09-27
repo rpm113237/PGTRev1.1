@@ -1,12 +1,23 @@
 void RxStringParse(void) {
   //Serial.printf("length of rxValue in RxParseString = %d\n", rxValue.length());
+  String tagStr, valStr; //C:12.3; C is tag, 12.3 is val
   if ((digitalRead(StartButton) == LOW)) {
     Serial.printf("Start button is LOW\n");
     GoToSleep();
     }
   // else Serial.printf("Start button is HIGH\n");
-  if ((rxValue.length() > 0) || (digitalRead(StartButton) == LOW)) {  //awkward, do we need to check length?
+  if ((rxValue.length() > 0)) {  //nothing to do if len = 0
     Serial.printf("rxValue %s\n", rxValue.c_str());
+    int indxsemi = rxValue.indexOf(':');
+    tagStr= rxValue.substring(0,(indxsemi-1));
+    tagStr.toUpperCase();
+    Serial.print("tagstring upper = "); Serial.println (tagStr);
+
+    if(tagStr=="X") Serial.printf("X is found, hooray\n");
+
+    while(1);
+
+
     Serial.printf("rxValue[0], to upper is %c\n", toupper(rxValue[0]));
     if ((toupper(rxValue[0]) == 'X') || (digitalRead(StartButton) == LOW)) {
       //Serial.printf (" X found\n");
@@ -26,16 +37,16 @@ void RxStringParse(void) {
 
         */
     else if (toupper(rxValue[0]) == 'C') {
-      Serial.printf(" C found, do calibration now\n");
-      std::string calstring;  //string that is weight
-      calstring = rxValue.substr(1, rxValue.length());
-      if (calstring.length() > 0) {
-        uint32_t calweight = uint32_t(stof(calstring) * 10);  //have to divide the readings by ten
-        Serial.printf("calweight (*10) = %ld\n", calweight);
-        scale.calibrate_scale(calweight, 20);  //20 times should be plenty
-        float calcscale = scale.get_scale();
-        Serial.printf(" calscale = %f \n", calcscale);
-      } else Serial.printf("Zero length cal value string\n");
+      // Serial.printf(" C found, do calibration now\n");
+      // std::string calstring;  //string that is weight
+      // calstring = rxValue.substr(1, rxValue.length());
+      // if (calstring.length() > 0) {
+      //   uint32_t calweight = uint32_t(stof(calstring) * 10);  //have to divide the readings by ten
+      //   Serial.printf("calweight (*10) = %ld\n", calweight);
+      //   scale.calibrate_scale(calweight, 20);  //20 times should be plenty
+      //   float calcscale = scale.get_scale();
+      //   Serial.printf(" calscale = %f \n", calcscale);
+      // } else Serial.printf("Zero length cal value string\n");
     } else if (toupper(rxValue[0] == 'T')) {  //tare
       Serial.printf("***Doing tare***\n");
       scale.tare(20);  //20X should be plenty

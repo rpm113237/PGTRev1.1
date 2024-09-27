@@ -52,7 +52,7 @@ BLECharacteristic* pTxCharacteristic;
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 float txValue = 0;
-std::string rxValue{};  // so can process outside of callback; maybe not the best idea
+String rxValue{};  // so can process outside of callback; maybe not the best idea
 
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
