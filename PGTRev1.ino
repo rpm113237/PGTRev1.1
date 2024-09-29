@@ -172,6 +172,9 @@ void setup() {
 
   //set up flash
   prefs.begin("BatADCScale");   //multiply adc float by this to get voltage
+  prefs.begin("SSID");
+  prefs.begin ("PWD");
+  prefs.begin("RunTime"); //run time in ms.
 
   //set up the scale
 
@@ -221,8 +224,8 @@ void setup() {
 
 void loop() {
 
-  server.handleClient();
-  ElegantOTA.loop();
+  // server.handleClient();
+  // ElegantOTA.loop();
 
   BattChecker.update();  // BatSnsCk checks battery, sends voltage
   LEDtimer.update();     //should call the ledBlink every 10ms.

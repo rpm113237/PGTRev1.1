@@ -9,6 +9,7 @@
 #define CONN_WAIT_TM 10 * MS_TO_SEC //time to wait to connect 
 #define SHAVE_HAIRCUT 0x1b  //use esc for shave and haircut
 
+
 RTC_DATA_ATTR int bootCount = 0;   //keep track of how many times since power on
 
 
@@ -69,11 +70,13 @@ struct COLORS {
 int BlinkTime = CNCT_LED_BLINK_TIME;  //blink ON/OFF TIME; if ==0, ON
 int LEDSelect = 0;     //0 or 1; make enum
 const int BatSns = 2;
+const int NumADCRdgs = 10; //number of times to read ADC in floatADC
 float battvolts = 0.0;
 float Batt_HI_Lvl = 3.6;
 float Batt_OK_Lvl = 3.5;
 float Batt_LO_Lvl = 3.3;
-float BatSnsFactor = 0.0010040;  //TODO -find the nominal value
+float BatMultDefault = 0.001019;  //TODO -find the nominal value
+float BatSnsFactor =0.0;
 
 const int Batt_CK_Interval = 60 * MS_TO_SEC;
 #define Battmah 1000

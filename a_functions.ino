@@ -99,6 +99,13 @@ void SetPwd(void){
 
 void DoOTA(void){
   Serial.println ("DoOTA");
+  ConnectWiFi();
+  Serial.println("Hung up awaiting boot");
+  while (1){
+  server.handleClient();
+  ElegantOTA.loop();
+
+  }
   return;
 }
 void CalibrateScale(void){
@@ -336,18 +343,23 @@ void print_wakeup_reason() {
 
 void BatSnsCk(void) {
   //reads the ADC on BatSns
-  float battmult =0;
+  //float battmult =0;
   int battpcnt;
   int battvoltx100 = 0;  //batt volts *100, rounded to int
-  int battrdg = 0;       //raw
-  battmult = prefs.getFloat("BatADCScale");
+  float battrdg = 0;       //raw
+  BatSnsFactor = prefs.getFloat("BatADCScale");
+  if (isnan(BatSnsFactor)){
+     Serial.println("multipler not initialized, caclulate proper battmultdefault");
+     BatSnsFactor = BatMultDefault;
+     }
   //battrdg = analogRead(BatSns);
-  battvolts = getFloatADC(10)*battmult;
-  Serial.printf("batt mult = %f, batt volts = %f\n", battmult, battvolts);
-  while (1);
+  battrdg = getFloatADC(NumADCRdgs);
+  battvolts = battrdg*BatSnsFactor;
+  Serial.printf("ADCRaw = %f\tbatt mult = %f\t batt volts = %f \t numrdgs = %d\n",battrdg,BatSnsFactor, battvolts, NumADCRdgs);
+  //while (1);
   //battvolts = ((float)battrdg * 2 * 3.2 * 210 / 310) / 4095;  //fudge; something wrong with voltage divider--impedance too high--r11 = 210k? WTF??
-  battvolts = ((float)battrdg / 955);  //fudge for now; later do a calibration routine
-  Serial.printf("******Battery: Raw = %d;  volts = %.2f****** \n", battrdg, battvolts);
+  //battvolts = ((float)battrdg / 955);  //fudge for now; later do a calibration routine
+  //Serial.printf("******Battery: Raw = %d; mult = %f, volts = %.2f****** \n", battrdg,BatSnsFactor, battvolts);
   //sprintf(TxString, "E:%.2f", battvolts);
   //reference: https://blog.ampow.com/lipo-voltage-chart/
   battvoltx100 = roundf(battvolts * 100);
@@ -475,3 +487,5 @@ void MorseChar(int cwChar) {
 
   } else Serial.printf("character %d not recognized\n", cwChar);
 }
+
+

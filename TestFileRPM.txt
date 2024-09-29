@@ -1,1 +1,0 @@
-This is just to find out how git works.
