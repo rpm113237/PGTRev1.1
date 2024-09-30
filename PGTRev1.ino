@@ -126,7 +126,7 @@ void setup() {
   LEDBlink(); //Give them a green.
   print_wakeup_reason();
   Soundwakeup();  //wake up feedback
-  Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));  
+  //Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));  
 
   //set up LED's
   // pinMode(LEDRED, OUTPUT);
@@ -168,28 +168,36 @@ void setup() {
 
   // Start advertising
   pServer->getAdvertising()->start();
-   Serial.printf("BLE advertising time = %lu ms\n", (millis()-lagmsStart));  
+  // Serial.printf("BLE advertising time = %lu ms\n", (millis()-lagmsStart));  
 
   //set up flash
   prefs.begin("BatADCScale");   //multiply adc float by this to get voltage
   prefs.begin("SSID");
   prefs.begin ("PWD");
   prefs.begin("RunTime"); //run time in ms.
+  prefs.begin("ScaleScale"); 
 
   //set up the scale
 
   scale.begin(HX711_dout, HX711_sck);
   scale.reset();  //if coming out of deep sleep; scale might be powered down
   // Serial.print("read average of 10--stabilize: \t\t");
-  Serial.printf("*********Warm up read 10X; val = %.2f*********\n", scale.read_average(10));  // print the average of 10 readings from the ADC
+  
                                                                                               //************* to stand out in log
-  scale.set_scale(9631.0);                                                                    //This value needs to be default; a cal function needs to be implemented
+  scale.tare(NumTare);  // reset the scale to 0
+  //Serial.printf("Scale tared, offset = %ld ", scale.get_offset());
+  //Serial.printf("Warm up read= %dX\tval = %.2f\tTared %d times\n",NumWarmup, scale.read_average(NumWarmup), NumTare);  // print the average of 10 readings from the ADC
+  scaleCalVal = prefs.getFloat("ScaleScale");
+  if (isnan(scaleCalVal)){
+    Serial.println ("Scale Cal not loaded, use default--check default typicality");
+    scaleCalVal = scaleCalDeflt;
+  }  
+  scale.set_scale(scaleCalVal);  //This value needs to be default; a cal function needs to be implemented
   // scale.set_scale(scaleCal);
   // need
   // this value is obtained by calibrating the scale with known weights; see the README for details
-  scale.tare();  // reset the scale to 0
-
- Serial.printf("Scale setup and tared time = %lu ms\n", (millis()-lagmsStart));  
+  
+ Serial.printf("Scale setup, tared calvalue = %f  time = %lu ms\n", scaleCalVal, (millis()-lagmsStart));  
 
   oldmillis = millis();
   el_time = millis() - oldmillis;

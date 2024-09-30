@@ -17,8 +17,10 @@ unsigned long oldmillis;  //to time the states
 unsigned long int el_time = 0;  //elapsed time
 
 float scaleVal = 0.0;  //scale data
-float scaleCal = 12496.0;  //estimated at 70 lbs
-
+float scaleCalVal = 8545.85;  //replace with typical number.
+float scaleCalDeflt = 8545.85;  //measured on SN10
+const int NumWarmup =10;
+const int NumTare = 10;
 char TxString[25];  // used to transmit
 
 //HX711 pins:
@@ -102,7 +104,7 @@ void CalibrateADC(String strval);
 void SetSSID(void);
 void SetPwd(void);
 void DoOTA(void);
-void CalibrateScale(void);
+void CalibrateScale(String strval);
 void DoTare(void);
 float getFloatADC(int numtimes);
 

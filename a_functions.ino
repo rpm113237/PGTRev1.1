@@ -32,25 +32,9 @@ void RxStringParse(void) {
     else if (tagStr == "S") SetSSID();
     else if (tagStr == "P") SetPwd();
     else if (tagStr == "O") DoOTA();   
-    else if (tagStr == "C") CalibrateScale();
+    else if (tagStr == "C") CalibrateScale(valStr);
     else if (tagStr== "T") DoTare();    //not sure why we need this
-       /*Procedure for calibration is:
-        --app sends an X for tare.  tare is done on start up, but good practice. Tare takes 20 samples--2 sec +/-
-        --app sends X:NN.N.  NN.N is in lbs/kilograms Note: the calibration is actually 
-        the scale calibrates, stores the calibration factor.
-
-        */
-      // Serial.printf(" C found, do calibration now\n");
-      // std::string calstring;  //string that is weight
-      // calstring = rxValue.substr(1, rxValue.length());
-      // if (calstring.length() > 0) {
-      //   uint32_t calweight = uint32_t(stof(calstring) * 10);  //have to divide the readings by ten
-      //   Serial.printf("calweight (*10) = %ld\n", calweight);
-      //   scale.calibrate_scale(calweight, 20);  //20 times should be plenty
-      //   float calcscale = scale.get_scale();
-      //   Serial.printf(" calscale = %f \n", calcscale);
-      // } else Serial.printf("Zero length cal value string\n");
-     
+       
      else {
       Serial.println("Unknown Tag =" + tagStr);
     }
@@ -70,16 +54,7 @@ float getFloatADC(int numtimes){
 void CalibrateADC(String strval){  //TODO pass string, do float converstion in procedure
   float BatCalValue = strval.toFloat();
   int numrdgs = 10;   //probably needs to be in squeezer.h
-  // float adcavg=0;
-  // int i;
-  // int numrdgs = 10;
-  // int adcrdg;
-  // for (i=1; i<=numrdgs; i++){    //find out how much noise
-  // adcrdg = (float)analogRead(BatSns);  
-  // Serial.printf("instantaneous adc rdg = %d\n", adcrdg);
-  // adcavg = (float) adcrdg+adcavg;
-  // }
-  // adcavg = adcavg/10;
+  
   float adcrdg = getFloatADC(numrdgs);
   Serial.printf("Calibrate ADC, adcaverage = %f over %d rdgs\n",adcrdg,numrdgs);
   BatSnsFactor = BatCalValue/adcrdg;  // l
@@ -108,8 +83,15 @@ void DoOTA(void){
   }
   return;
 }
-void CalibrateScale(void){
-  Serial.println ("CalibrateS cale");
+void CalibrateScale(String strval){    //C:float known weight
+//assumes tared prior to known weight attached
+//we want to get to .01 lbs, multiply weight by 100; then multiply scale factor by 100
+ int calweight = roundf(100.0*strval.toFloat());
+scale.calibrate_scale(calweight, NumTare);
+scaleCalVal = scale.get_scale()* 100.0;    //adjust for 100X
+scale.set_scale(scaleCalVal);
+prefs.putFloat("ScaleScale",scaleCalVal);
+Serial.printf ("Calibration done; calweight = %f;  scale factor = %f\n", calweight/100.0, scaleCalVal);
 }
 
 void DoTare(void){
@@ -331,19 +313,10 @@ void print_wakeup_reason() {
   }
 }
 
-// float ReadVoltage(byte ADC_Pin) {
-//   float calibration  = 1.000; // Adjust for ultimate accuracy when input is measured using an accurate DVM, if reading too high then use e.g. 0.99, too low use 1.01
-//   float vref = 1100;
-//   float voltage_divider_multiplier =  2.174;   //this should be a eeprom stored value in if calibration needed.
-//   esp_adc_cal_characteristics_t adc_chars;
-//   esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_BIT_12, 1100, &adc_chars);
-//   vref = adc_chars.vref; // Obtain the device ADC reference voltage
-//   return (analogRead(ADC_Pin) / 4095.0) * 3.3 * voltage_divider_multiplier * (1100 / vref) * calibration;  // ESP by design reference voltage in mV
-// }
+
 
 void BatSnsCk(void) {
-  //reads the ADC on BatSns
-  //float battmult =0;
+   
   int battpcnt;
   int battvoltx100 = 0;  //batt volts *100, rounded to int
   float battrdg = 0;       //raw
@@ -352,15 +325,11 @@ void BatSnsCk(void) {
      Serial.println("multipler not initialized, caclulate proper battmultdefault");
      BatSnsFactor = BatMultDefault;
      }
-  //battrdg = analogRead(BatSns);
+  
   battrdg = getFloatADC(NumADCRdgs);
   battvolts = battrdg*BatSnsFactor;
-  Serial.printf("ADCRaw = %f\tbatt mult = %f\t batt volts = %f \t numrdgs = %d\n",battrdg,BatSnsFactor, battvolts, NumADCRdgs);
-  //while (1);
-  //battvolts = ((float)battrdg * 2 * 3.2 * 210 / 310) / 4095;  //fudge; something wrong with voltage divider--impedance too high--r11 = 210k? WTF??
-  //battvolts = ((float)battrdg / 955);  //fudge for now; later do a calibration routine
-  //Serial.printf("******Battery: Raw = %d; mult = %f, volts = %.2f****** \n", battrdg,BatSnsFactor, battvolts);
-  //sprintf(TxString, "E:%.2f", battvolts);
+  //Serial.printf("ADCRaw = %f\tbatt mult = %f\t batt volts = %f \t numrdgs = %d\n",battrdg,BatSnsFactor, battvolts, NumADCRdgs);
+  
   //reference: https://blog.ampow.com/lipo-voltage-chart/
   battvoltx100 = roundf(battvolts * 100);
   if (battvoltx100 >= 420) battpcnt = 100;
@@ -409,14 +378,13 @@ void SoundBuzz(u_long cwFreq, int sound_ms) {
   // Serial.printf(" Freq =%d HZ, for %d ms\n", cwFreq, sound_ms);
   smillis = millis();
   ledcAttach(buzzPin, freq, resolution);  //eight bit resolution--why? (Jun24?)
-  //ledcSetup(ledChannel, cwFreq, resolution);
   ledcWrite(buzzPin, dutycycle);
   while ((millis() - smillis) < sound_ms) {}
   ledcWrite(buzzPin, 0);  //off
 }
 
 void Soundwakeup(void) {
-  //the start buttom has been pushed
+  //the start button has been pushed
   MorseChar('o');
 }
 
