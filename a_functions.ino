@@ -1,110 +1,109 @@
 void RxStringParse(void) {
-  //Serial.printf("length of rxValue in RxParseString = %d\n", rxValue.length());
+
   String tagStr, valStr;  //C:12.3; C is tag, 12.3 is val
-  //float FloatVal = 4.2;   //valStr converted to float 4.2 is +/-charge voltage
   if ((digitalRead(StartButton) == LOW)) {
     Serial.printf("Start button is LOW\n");
     GoToSleep();
   }
-  // else Serial.printf("Start button is HIGH\n");
+
   if ((rxValue.length() > 0)) {  //nothing to do if len = 0
-    Serial.println("rxValue "+ rxValue);
+    Serial.println("rxValue " + rxValue);
     int indxsemi = rxValue.indexOf(':');
-    Serial.printf("Index of semi colon is %d\n" , indxsemi);
-    if (indxsemi <0) indxsemi =1;   // make it work for single tags w/o semi
+    Serial.printf("Index of semi colon is %d\n", indxsemi);
+    if (indxsemi < 0) indxsemi = 1;  // make it work for single tags w/o semi
     tagStr = rxValue.substring(0, indxsemi);
     tagStr.toUpperCase();
     Serial.print("tagstring upper = ");
     Serial.println(tagStr);
-    if (rxValue.length()> (indxsemi+1)){
-      Serial.println( "A value exists\n");    //leave it as a string
-      valStr = rxValue.substring((indxsemi+1), rxValue.length());
-      Serial.println("Value String = "+ valStr); 
+    if (rxValue.length() > (indxsemi + 1)) {
+      Serial.println("A value exists\n");  //leave it as a string
+      valStr = rxValue.substring((indxsemi + 1), rxValue.length());
+      Serial.println("Value String = " + valStr);
     }
-    //FloatVal = tagStr.toFloat();
+
 
     if (tagStr == "X") {
       // Serial.printf("X is found, hooray\n");
       Serial.printf(" Tag 'X' received, Going to Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
-      GoToSleep();     
-    }
-    else if (tagStr == "V") CalibrateADC(valStr);
+      GoToSleep();
+    } else if (tagStr == "V") CalibrateADC(valStr);
     else if (tagStr == "S") SetSSID();
     else if (tagStr == "P") SetPwd();
-    else if (tagStr == "O") DoOTA();   
+    else if (tagStr == "O") DoOTA();
     else if (tagStr == "C") CalibrateScale(valStr);
-    else if (tagStr== "T") DoTare();    //not sure why we need this
-       
-     else {
+    else if (tagStr == "T") DoTare();  //not sure why we need this
+
+    else {
       Serial.println("Unknown Tag =" + tagStr);
     }
     rxValue.clear();  //erases
   }
 }
-float getFloatADC(int numtimes){
+float getFloatADC(int numtimes) {
   float adcavg = 0.0;
-  int i;    //old FORTRAN pgmr
-  for (i=1; i<=numtimes; i++ ){
+  int i;  //old FORTRAN pgmr
+  for (i = 1; i <= numtimes; i++) {
     adcavg = adcavg + (float)analogRead(BatSns);
   }
-  return adcavg/numtimes;
-
+  return adcavg / numtimes;
 }
 
-void CalibrateADC(String strval){  //TODO pass string, do float converstion in procedure
+void CalibrateADC(String strval) {  //TODO pass string, do float converstion in procedure
   float BatCalValue = strval.toFloat();
-  int numrdgs = 10;   //probably needs to be in squeezer.h
-  
+  int numrdgs = 10;  //probably needs to be in squeezer.h
+
   float adcrdg = getFloatADC(numrdgs);
-  Serial.printf("Calibrate ADC, adcaverage = %f over %d rdgs\n",adcrdg,numrdgs);
-  BatSnsFactor = BatCalValue/adcrdg;  // l
-  Serial.printf ("BatSns factor = %f\n",BatSnsFactor);
+  Serial.printf("Calibrate ADC, adcaverage = %f over %d rdgs\n", adcrdg, numrdgs);
+  BatSnsFactor = BatCalValue / adcrdg;  // l
+  Serial.printf("BatSns factor = %f\n", BatSnsFactor);
   prefs.putFloat("BatADCScale", BatSnsFactor);
-  //TODO 
+  //TODO
 }
 void SetSSID(void) {
-  Serial.println ("SetSSID");
+  Serial.println("SetSSID");
   return;
 }
 
-void SetPwd(void){
+void SetPwd(void) {
   Serial.println("SetPWD");
   return;
 }
 
-void DoOTA(void){
-  Serial.println ("DoOTA");
+void DoOTA(void) {
+  Serial.println("DoOTA");
   ConnectWiFi();
   Serial.println("Hung up awaiting boot");
-  while (1){
-  server.handleClient();
-  ElegantOTA.loop();
-
+  while (1) {
+    server.handleClient();
+    ElegantOTA.loop();
   }
   return;
 }
-void CalibrateScale(String strval){    //C:float known weight
-//assumes tared prior to known weight attached
-//we want to get to .01 lbs, multiply weight by 100; then multiply scale factor by 100
- int calweight = roundf(100.0*strval.toFloat());
-scale.calibrate_scale(calweight, NumTare);
-scaleCalVal = scale.get_scale()* 100.0;    //adjust for 100X
-scale.set_scale(scaleCalVal);
-prefs.putFloat("ScaleScale",scaleCalVal);
-Serial.printf ("Calibration done; calweight = %f;  scale factor = %f\n", calweight/100.0, scaleCalVal);
+void CalibrateScale(String strval) {  //C:float known weight
+                                      //assumes tared prior to known weight attached
+                                      //we want to get to .01 lbs, multiply weight by 100; then multiply scale factor by 100
+  int calweight = roundf(100.0 * strval.toFloat());
+  scale.calibrate_scale(calweight, NumTare);
+  scaleCalVal = scale.get_scale() * 100.0;  //adjust for 100X
+  scale.set_scale(scaleCalVal);
+  prefs.putFloat("ScaleScale", scaleCalVal);
+  Serial.printf("Calibration done; calweight = %f;  scale factor = %f\n", calweight / 100.0, scaleCalVal);
 }
 
-void DoTare(void){
-   //tare
-      Serial.printf("***Doing tare***\n");
-      scale.tare(20);  //20X should be plenty
-      long scaleoffset = scale.get_offset();
-      Serial.printf("Tare done, offset = %ld\n", scaleoffset);
-  
+void DoTare(void) {
+  //tare
+  Serial.printf("***Doing tare***\n");
+  scale.tare(20);  //20X should be plenty
+  long scaleoffset = scale.get_offset();
+  Serial.printf("Tare done, offset = %ld\n", scaleoffset);
 }
 
 
 void ConnectWiFi(void) {
+  // ssid = (prefs.getString("SSID","" )).c_str();    //stored as cpp String
+  // if (ssid == ""){
+  //   Serial.printf("No ssid stored, using default = %s\n", DefaultSSID);
+  // }
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
   Serial.println("Hello World OTA");
@@ -186,6 +185,7 @@ void CheckForce(void) {  //PGT1 changed
   int arraysz = sizeof(Force.ForceArray) / sizeof(Force.ForceArray[0]);
   if (scale.is_ready()) {  //.get_units is blocking.
     scaleVal = scale.get_units(scaleSamples);
+    if (scaleVal > MinForce) SleepTimerStart = millis() / 1000;  //reset sleep timer.
     for (i = (arraysz - 1); i > 0; i--) {
       Force.ForceArray[i] = Force.ForceArray[i - 1];  //move everything up one spot
     }
@@ -316,20 +316,20 @@ void print_wakeup_reason() {
 
 
 void BatSnsCk(void) {
-   
+
   int battpcnt;
   int battvoltx100 = 0;  //batt volts *100, rounded to int
-  float battrdg = 0;       //raw
+  float battrdg = 0;     //raw
   BatSnsFactor = prefs.getFloat("BatADCScale");
-  if (isnan(BatSnsFactor)){
-     Serial.println("multipler not initialized, caclulate proper battmultdefault");
-     BatSnsFactor = BatMultDefault;
-     }
-  
+  if (isnan(BatSnsFactor)) {
+    Serial.println("multipler not initialized, caclulate proper battmultdefault");
+    BatSnsFactor = BatMultDefault;
+  }
+
   battrdg = getFloatADC(NumADCRdgs);
-  battvolts = battrdg*BatSnsFactor;
+  battvolts = battrdg * BatSnsFactor;
   //Serial.printf("ADCRaw = %f\tbatt mult = %f\t batt volts = %f \t numrdgs = %d\n",battrdg,BatSnsFactor, battvolts, NumADCRdgs);
-  
+
   //reference: https://blog.ampow.com/lipo-voltage-chart/
   battvoltx100 = roundf(battvolts * 100);
   if (battvoltx100 >= 420) battpcnt = 100;
@@ -355,6 +355,7 @@ void BatSnsCk(void) {
 
   if (battvoltx100 < 371) UseRedLED = true;
   if (battvoltx100 < 3.5) {
+    Serial.println (" Battery critically low (<3.5), going to sleep");
     GoToSleep();
   }
   sprintf(TxString, "BP:%d,%d", battpcnt, (battpcnt * BattFullTime) / 100);
@@ -364,8 +365,11 @@ void BatSnsCk(void) {
 
 void GoToSleep(void) {
   scale.power_down();
+  //turn off the leds
+  pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));
+  pixels.show();  // Send the updated pixel colors to the hardware.
   MorseChar(SHAVE_HAIRCUT);
-  Serial.printf("******Low Battery Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
+  //Serial.printf("******Low Battery Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
   esp_deep_sleep_enable_gpio_wakeup(1 << StartButton, ESP_GPIO_WAKEUP_GPIO_LOW);
   esp_deep_sleep_start();
   Serial.println("This never happens");
@@ -456,4 +460,20 @@ void MorseChar(int cwChar) {
   } else Serial.printf("character %d not recognized\n", cwChar);
 }
 
-
+void RunTimeCheck() {
+  //increments sleep timer by seconds
+  static bool firsttime = true;
+  int runtimeseconds = (millis() / 1000 - SleepTimerStart);
+  Serial.printf("\t\tidle time = %d seconds\n", runtimeseconds);
+  if ((runtimeseconds > (SleepTimeMax - 30)) && (firsttime == true)) {
+    Serial.println("Idlewarning");
+    MorseChar('s');
+    MorseChar('o');
+    MorseChar('s');
+    firsttime = false;
+  }
+  if (runtimeseconds > SleepTimeMax) {
+    Serial.printf("No activity for %lu seconds, go to sleep\n", SleepTimeMax);
+    GoToSleep();
+  }
+}

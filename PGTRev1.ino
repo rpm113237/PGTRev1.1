@@ -25,8 +25,14 @@ Preferences prefs;
 #include <ElegantOTA.h>
 WebServer server(80);
 
-const char* ssid = "McClellan_Workshop";
-const char* password = "Rangeland1";
+char SSstr[25] = "McClellan_Workshop";   //max from ble is about 20(?)- 2 for tag.
+char PWDstr[25] = "Rangeland1";
+
+const char* ssid = SSstr;
+const char* password = PWDstr;
+
+// const char* ssid = "McClellan_Workshop";
+// const char* password = "Rangeland1";
 
 
 // if it is the C3 or other single core ESP32" Use core 0
@@ -44,6 +50,8 @@ TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);  //calls LEDBlink, called every 10MS,
 TickTwo VibReport(VibSend, VIB_SND_INTERVAL, 0, MILLIS);  //send vibration data every VIB_SND_INTERVAL (ms), forever
 
 TickTwo BattChecker(BatSnsCk, Batt_CK_Interval, 0, MILLIS);  //checks battery every Batt_Ck_Interval
+
+TickTwo SleepChecker(RunTimeCheck, 10000, 0, MILLIS);  //check sleeptimers every ten seconds
 
 
 //construct Button2
@@ -116,27 +124,27 @@ HX711 scale;
 
 // the setup function runs once when you press reset or power the board
 void setup() {
+
+
   // initialize serial communication at 115200 bits per second:
   u_long lagmsStart = millis();
   Serial.begin(115200);
-  Serial.printf("\nHello from Protocol Grip Trainer v25Jul24, time = \t%lu ms\n", (millis()-lagmsStart));  
+  Serial.printf("\nHello from Protocol Grip Trainer v25Jul24, time = \t%lu ms\n", (millis() - lagmsStart));
 
   ledcAttach(buzzPin, freq, resolution);  //eight bit resolution--why? (Jun24?); using for PWM
   setLED(00, clrs.GREEN);
-  LEDBlink(); //Give them a green.
+  LEDBlink();  //Give them a green.
   print_wakeup_reason();
   Soundwakeup();  //wake up feedback
-  //Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));  
-
-  //set up LED's
-  // pinMode(LEDRED, OUTPUT);
-  // pinMode(LEDBLUE, OUTPUT);
+  //Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));
+  
   pinMode(StartButton, INPUT);
 
   //start the TickTwo timers
-  LEDtimer.start();     //start LED timer
-  BattChecker.start();  //start Batt checker
-  VibReport.start();    //start Vib report
+  LEDtimer.start();      //start LED timer
+  BattChecker.start();   //start Batt checker
+  VibReport.start();     //start Vib report
+  SleepChecker.start();  //start sleepchecker
 
   // Create the BLE Device
   BLEDevice::init("Squeezer");
@@ -168,42 +176,38 @@ void setup() {
 
   // Start advertising
   pServer->getAdvertising()->start();
-  // Serial.printf("BLE advertising time = %lu ms\n", (millis()-lagmsStart));  
+  // Serial.printf("BLE advertising time = %lu ms\n", (millis()-lagmsStart));
 
   //set up flash
-  prefs.begin("BatADCScale");   //multiply adc float by this to get voltage
+  prefs.begin("BatADCScale");  //multiply adc float by this to get voltage
   prefs.begin("SSID");
-  prefs.begin ("PWD");
-  prefs.begin("RunTime"); //run time in ms.
-  prefs.begin("ScaleScale"); 
+  prefs.begin("PWD");
+  prefs.begin("RunTime");  //run time in minutes? 10K minutes = 166hrs.  Not long enough.  
+  prefs.begin("ScaleScale");
+
+  
 
   //set up the scale
 
   scale.begin(HX711_dout, HX711_sck);
   scale.reset();  //if coming out of deep sleep; scale might be powered down
   // Serial.print("read average of 10--stabilize: \t\t");
-  
-                                                                                              //************* to stand out in log
+
+  //************* to stand out in log
   scale.tare(NumTare);  // reset the scale to 0
   //Serial.printf("Scale tared, offset = %ld ", scale.get_offset());
   //Serial.printf("Warm up read= %dX\tval = %.2f\tTared %d times\n",NumWarmup, scale.read_average(NumWarmup), NumTare);  // print the average of 10 readings from the ADC
   scaleCalVal = prefs.getFloat("ScaleScale");
-  if (isnan(scaleCalVal)){
-    Serial.println ("Scale Cal not loaded, use default--check default typicality");
+  if (isnan(scaleCalVal)) {
+    Serial.println("Scale Cal not loaded, use default--check default typicality");
     scaleCalVal = scaleCalDeflt;
-  }  
+  }
   scale.set_scale(scaleCalVal);  //This value needs to be default; a cal function needs to be implemented
-  // scale.set_scale(scaleCal);
-  // need
-  // this value is obtained by calibrating the scale with known weights; see the README for details
-  
- Serial.printf("Scale setup, tared calvalue = %f  time = %lu ms\n", scaleCalVal, (millis()-lagmsStart));  
+  Serial.printf("Scale setup, tared calvalue = %f  time = %lu ms\n", scaleCalVal, (millis() - lagmsStart));
 
   oldmillis = millis();
   el_time = millis() - oldmillis;
   setLED(500, clrs.BLUE);
-  // pixels.setPixelColor(LEDSelect, pixels.Color(clrs.RED[0], clrs.RED[1], clrs.RED[2]));
-  // pixels.show();  // Send the updated pixel colors to the hardware.
 
   Serial.print("Connecting (BLE)\n");
   BlinkTime = CNCT_LED_BLINK_TIME;
@@ -214,7 +218,7 @@ void setup() {
       Serial.print(".");
       //pServer->startAdvertising();  // restart advertising
     }
-    //setLED(0, clrs.BLUE);
+
     LEDBlink();  //has to be called, since timer isn't being called?? or call timer?
     delay(10);
     el_time = millis() - oldmillis;
@@ -222,29 +226,26 @@ void setup() {
 
   if (!deviceConnected) {
     Serial.printf("****end of setup; not connected****\n");
-    // newseqstate(START, CHG_CONNECT_LED, 0, clrs.OFF);
+
   } else {
     Serial.printf("****end of setup; BLE connected****\n");
     setLED(0, clrs.BLUE);  //for ledBlink
-      }
-  
+  }
+  SleepTimer = 0;
+  SleepTimerStart = millis() / 1000;  //reset the sleeptimers
 }
 
 void loop() {
 
-  // server.handleClient();
-  // ElegantOTA.loop();
-
   BattChecker.update();  // BatSnsCk checks battery, sends voltage
   LEDtimer.update();     //should call the ledBlink every 10ms.
-  VibReport.update();
+  VibReport.update();    //
+  SleepChecker.update();   //check for timeout
   RxStringParse();
-  //button.loop();    // what for?? do we want device turn off?
   BLEReconnect();  //TODO does this work???
   CheckForce();    //check force does the sending.
-  //VibSend();
-  //  above commented out for battery test
-  //delay(1000);
+  //RunTimeCheck();  //checks timeouts, etc.
+
 
 
 }  //end of loop

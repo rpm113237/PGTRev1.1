@@ -1,3 +1,4 @@
+#include <stdint.h>
 #ifndef _SQUEEZER_H
 #define _SQUEEZER_H
 #include <Adafruit_NeoPixel.h>
@@ -87,8 +88,13 @@ const int Batt_CK_Interval = 60 * MS_TO_SEC;
 
 //StartSwitch--TODO--second switch, if needed.
 const int StartButton = 1;  //
-const int LongClickTime = 3000; // time for long click to shut down?
-//const int FastPin = 18;   //set =1 for 80 samplses/sec
+//const int LongClickTime = 3000; // time for long click to shut down?
+const int FastPin = 18;   //set =1 for 80 samplses/sec
+
+uint16_t SleepTimer;    // in seconds reset if HF> MinForce
+uint32_t SleepTimeMax = 300;   //sleep timeout in sec
+int  MinForce = 1;    //if HF < MinForce, sleeptimer
+uint32_t SleepTimerStart;  // if HF> MinForce, reset SleepTimerStart to current millis()/mstosec
 
 //const int numSamples = 2;
 long int scaleRead = 0;
@@ -107,6 +113,7 @@ void DoOTA(void);
 void CalibrateScale(String strval);
 void DoTare(void);
 float getFloatADC(int numtimes);
+void RunTimeCheck(void);
 
 
 #endif
