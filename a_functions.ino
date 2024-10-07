@@ -1,10 +1,10 @@
 void RxStringParse(void) {
 
   String tagStr, valStr;  //C:12.3; C is tag, 12.3 is val
-  if ((digitalRead(StartButton) == LOW)) {
-    Serial.printf("Start button is LOW\n");
-    GoToSleep();
-  }
+  // if ((digitalRead(StartButton) == LOW)) {
+  //   Serial.printf("Start button is LOW, Go To Sleep\n");
+  //   GoToSleep();
+  // }
 
   if ((rxValue.length() > 0)) {  //nothing to do if len = 0
     Serial.println("rxValue " + rxValue);
@@ -27,8 +27,8 @@ void RxStringParse(void) {
       Serial.printf(" Tag 'X' received, Going to Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
       GoToSleep();
     } else if (tagStr == "V") CalibrateADC(valStr);
-    else if (tagStr == "S") SetSSID();
-    else if (tagStr == "P") SetPwd();
+    else if (tagStr == "S") SetSSID(valStr);
+    else if (tagStr == "P") SetPwd(valStr);
     else if (tagStr == "O") DoOTA();
     else if (tagStr == "C") CalibrateScale(valStr);
     else if (tagStr == "T") DoTare();  //not sure why we need this
@@ -59,14 +59,28 @@ void CalibrateADC(String strval) {  //TODO pass string, do float converstion in 
   prefs.putFloat("BatADCScale", BatSnsFactor);
   //TODO
 }
-void SetSSID(void) {
+void SetSSID(String ValStr) {
   Serial.println("SetSSID");
+  strcpy (SSstr ,ValStr.c_str());
+  prefs.putString("SSID",ValStr );    //store in flash as c++ String
+  Serial.printf("SetSSid string = %s", SSstr);
+  String retstr = prefs.getString("SSID", DefaultSSID);
+  //Serial.printf ("SSID retrived from flash =" + prefs.getString ("SSID"));
   return;
 }
 
-void SetPwd(void) {
+void SetPwd(String ValStr) {
   Serial.println("SetPWD");
   return;
+}
+
+void ResetSwitch(void){
+  
+  if ((digitalRead(StartButton) == LOW)) {
+    Serial.printf("Start button is LOW, Go To Sleep\n");
+    GoToSleep();
+  }
+
 }
 
 void DoOTA(void) {
@@ -76,6 +90,8 @@ void DoOTA(void) {
   while (1) {
     server.handleClient();
     ElegantOTA.loop();
+    SleepChecker.update();  //check for timeout
+    
   }
   return;
 }
@@ -105,6 +121,11 @@ void ConnectWiFi(void) {
   //   Serial.printf("No ssid stored, using default = %s\n", DefaultSSID);
   // }
   WiFi.mode(WIFI_STA);
+   //find ssid, pwd
+  strcpy(SSstr, prefs.getString("SSID", DefaultSSID).c_str());   //SSstr is init in squeezer.h
+  strcpy(PWDstr,prefs.getString("PWD",DefaultPWD).c_str());   //PWDstr is init in squeezer.h
+  Serial.printf("SSID = %s \n", SSstr);
+  Serial.printf ("PWD = %s \n", PWDstr);
   WiFi.begin(ssid, password);
   Serial.println("Hello World OTA");
 
@@ -322,13 +343,14 @@ void BatSnsCk(void) {
   float battrdg = 0;     //raw
   BatSnsFactor = prefs.getFloat("BatADCScale");
   if (isnan(BatSnsFactor)) {
-    Serial.println("multipler not initialized, caclulate proper battmultdefault");
     BatSnsFactor = BatMultDefault;
+    Serial.printf("ADC Mult not initialized, using default = %f\n", BatSnsFactor);
+    
   }
 
   battrdg = getFloatADC(NumADCRdgs);
   battvolts = battrdg * BatSnsFactor;
-  //Serial.printf("ADCRaw = %f\tbatt mult = %f\t batt volts = %f \t numrdgs = %d\n",battrdg,BatSnsFactor, battvolts, NumADCRdgs);
+  Serial.printf("floatADCRaw = %f\tbatt mult = %f\t batt volts = %f \t numrdgs = %d\n",battrdg,BatSnsFactor, battvolts, NumADCRdgs);
 
   //reference: https://blog.ampow.com/lipo-voltage-chart/
   battvoltx100 = roundf(battvolts * 100);

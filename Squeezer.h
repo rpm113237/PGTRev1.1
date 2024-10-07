@@ -99,6 +99,14 @@ uint32_t SleepTimerStart;  // if HF> MinForce, reset SleepTimerStart to current 
 //const int numSamples = 2;
 long int scaleRead = 0;
 
+//Flash (preferences.h) setup
+char SSstr[25] = "McClellan_Workshop";   //max from ble is about 20(?)- 2 for tag.
+char PWDstr[25] = "Rangeland1";
+const char* ssid = SSstr;
+const char* password = PWDstr;
+String DefaultSSID = "McClellan_Workshop";
+String DefaultPWD = "Rangeland1";
+
 //protos
 void setLED(int LedNo, int btime, int clrarray[]);
 void VibSend(void);
@@ -107,13 +115,14 @@ void LEDBlink(void);
 void BatSnsCk(void);
 void SoundBuzz(u_long cwFreq = 2500, int sound_ms = 100);
 void CalibrateADC(String strval);
-void SetSSID(void);
-void SetPwd(void);
+void SetSSID(String ValStr);
+void SetPwd(String ValStr);
 void DoOTA(void);
 void CalibrateScale(String strval);
 void DoTare(void);
 float getFloatADC(int numtimes);
 void RunTimeCheck(void);
+void ResetSwitch(void);
 
 
 #endif

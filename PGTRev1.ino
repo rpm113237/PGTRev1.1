@@ -25,16 +25,6 @@ Preferences prefs;
 #include <ElegantOTA.h>
 WebServer server(80);
 
-char SSstr[25] = "McClellan_Workshop";   //max from ble is about 20(?)- 2 for tag.
-char PWDstr[25] = "Rangeland1";
-
-const char* ssid = SSstr;
-const char* password = PWDstr;
-
-// const char* ssid = "McClellan_Workshop";
-// const char* password = "Rangeland1";
-
-
 // if it is the C3 or other single core ESP32" Use core 0
 #if CONFIG_FREERTOS_UNICORE
 static const BaseType_t app_cpu = 0;
@@ -137,7 +127,7 @@ void setup() {
   print_wakeup_reason();
   Soundwakeup();  //wake up feedback
   //Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));
-  
+
   pinMode(StartButton, INPUT);
 
   //start the TickTwo timers
@@ -180,12 +170,15 @@ void setup() {
 
   //set up flash
   prefs.begin("BatADCScale");  //multiply adc float by this to get voltage
-  prefs.begin("SSID");
+  prefs.begin("SSID");         //prefs library wants length of string
   prefs.begin("PWD");
-  prefs.begin("RunTime");  //run time in minutes? 10K minutes = 166hrs.  Not long enough.  
+  prefs.begin("RunTime");  //run time in minutes? 10K minutes = 166hrs.  Not long enough.
   prefs.begin("ScaleScale");
-
-  
+  //move next to connectWiFi??
+  strcpy(SSstr, prefs.getString("SSID", DefaultSSID).c_str());  //SSstr is init in squeezer.h
+  strcpy(PWDstr, prefs.getString("PWD", DefaultPWD).c_str());   //PWDstr is init in squeezer.h
+  Serial.printf("SSID = %s \n", SSstr);
+  Serial.printf("PWD = %s \n", PWDstr);
 
   //set up the scale
 
@@ -237,10 +230,11 @@ void setup() {
 
 void loop() {
 
-  BattChecker.update();  // BatSnsCk checks battery, sends voltage
-  LEDtimer.update();     //should call the ledBlink every 10ms.
-  VibReport.update();    //
-  SleepChecker.update();   //check for timeout
+  BattChecker.update();   // BatSnsCk checks battery, sends voltage
+  LEDtimer.update();      //should call the ledBlink every 10ms.
+  VibReport.update();     //
+  SleepChecker.update();  //check for timeout
+  ResetSwitch();
   RxStringParse();
   BLEReconnect();  //TODO does this work???
   CheckForce();    //check force does the sending.
