@@ -9,17 +9,15 @@ void RxStringParse(void) {
   if ((rxValue.length() > 0)) {  //nothing to do if len = 0
     Serial.println("rxValue " + rxValue);
     int indxsemi = rxValue.indexOf(':');
-    Serial.printf("Index of semi colon is %d\n", indxsemi);
+    //Serial.printf("Index of semi colon is %d\n", indxsemi);
     if (indxsemi < 0) indxsemi = 1;  // make it work for single tags w/o semi
     tagStr = rxValue.substring(0, indxsemi);
     tagStr.toUpperCase();
-    Serial.print("tagstring upper = ");
-    Serial.println(tagStr);
+    //Serial.print("tagstring upper = ");
+    //Serial.println(tagStr);
     if (rxValue.length() > (indxsemi + 1)) {
-      Serial.println("A value exists\n");  //leave it as a string
       valStr = rxValue.substring((indxsemi + 1), rxValue.length());
-      Serial.println("Value String = " + valStr);
-    }
+    } else valStr = "";  //null for checking
 
 
     if (tagStr == "X") {
@@ -49,20 +47,19 @@ float getFloatADC(int numtimes) {
 }
 
 void CalibrateADC(String strval) {  //TODO pass string, do float converstion in procedure
-  float BatCalValue = strval.toFloat();
-  int numrdgs = 10;  //probably needs to be in squeezer.h
-
+  float BatCalValue = 3.75;   //3.75 is default--TODO--move to defines
+  if (strval.length >0) BatCalValue = atof(strval.c_str());  //stops at first non numeric
+  int numrdgs = 10;  //probably needs to be in squeezer.h TODO
   float adcrdg = getFloatADC(numrdgs);
-  Serial.printf("Calibrate ADC, adcaverage = %f over %d rdgs\n", adcrdg, numrdgs);
-  BatSnsFactor = BatCalValue / adcrdg;  // l
-  Serial.printf("BatSns factor = %f\n", BatSnsFactor);
+    BatSnsFactor = BatCalValue / adcrdg;  // l
+  Serial.printf("Calibrate ADC to %f Volts, CalFactor = %f adcraw average = %f over %d rdgs\n",BatCalValue, BatSnsFactor, adcrdg, numrdgs);  
   prefs.putFloat("BatADCScale", BatSnsFactor);
-  //TODO
+  //TODO put the 3.75 default  and numrdg in defines 
 }
 void SetSSID(String ValStr) {
   Serial.println("SetSSID");
-  strcpy (SSstr ,ValStr.c_str());
-  prefs.putString("SSID",ValStr );    //store in flash as c++ String
+  strcpy(SSstr, ValStr.c_str());
+  prefs.putString("SSID", ValStr);  //store in flash as c++ String
   Serial.printf("SetSSid string = %s", SSstr);
   String retstr = prefs.getString("SSID", DefaultSSID);
   //Serial.printf ("SSID retrived from flash =" + prefs.getString ("SSID"));
@@ -74,13 +71,12 @@ void SetPwd(String ValStr) {
   return;
 }
 
-void ResetSwitch(void){
-  
+void ResetSwitch(void) {
+
   if ((digitalRead(StartButton) == LOW)) {
     Serial.printf("Start button is LOW, Go To Sleep\n");
     GoToSleep();
   }
-
 }
 
 void DoOTA(void) {
@@ -91,7 +87,6 @@ void DoOTA(void) {
     server.handleClient();
     ElegantOTA.loop();
     SleepChecker.update();  //check for timeout
-    
   }
   return;
 }
@@ -121,11 +116,11 @@ void ConnectWiFi(void) {
   //   Serial.printf("No ssid stored, using default = %s\n", DefaultSSID);
   // }
   WiFi.mode(WIFI_STA);
-   //find ssid, pwd
-  strcpy(SSstr, prefs.getString("SSID", DefaultSSID).c_str());   //SSstr is init in squeezer.h
-  strcpy(PWDstr,prefs.getString("PWD",DefaultPWD).c_str());   //PWDstr is init in squeezer.h
+  //find ssid, pwd
+  strcpy(SSstr, prefs.getString("SSID", DefaultSSID).c_str());  //SSstr is init in squeezer.h
+  strcpy(PWDstr, prefs.getString("PWD", DefaultPWD).c_str());   //PWDstr is init in squeezer.h
   Serial.printf("SSID = %s \n", SSstr);
-  Serial.printf ("PWD = %s \n", PWDstr);
+  Serial.printf("PWD = %s \n", PWDstr);
   WiFi.begin(ssid, password);
   Serial.println("Hello World OTA");
 
@@ -345,12 +340,11 @@ void BatSnsCk(void) {
   if (isnan(BatSnsFactor)) {
     BatSnsFactor = BatMultDefault;
     Serial.printf("ADC Mult not initialized, using default = %f\n", BatSnsFactor);
-    
   }
 
   battrdg = getFloatADC(NumADCRdgs);
   battvolts = battrdg * BatSnsFactor;
-  Serial.printf("floatADCRaw = %f\tbatt mult = %f\t batt volts = %f \t numrdgs = %d\n",battrdg,BatSnsFactor, battvolts, NumADCRdgs);
+  Serial.printf("floatADCRaw = %f\tbatt mult = %f\t batt volts = %f \t numrdgs = %d\n", battrdg, BatSnsFactor, battvolts, NumADCRdgs);
 
   //reference: https://blog.ampow.com/lipo-voltage-chart/
   battvoltx100 = roundf(battvolts * 100);
@@ -377,7 +371,7 @@ void BatSnsCk(void) {
 
   if (battvoltx100 < 371) UseRedLED = true;
   if (battvoltx100 < 3.5) {
-    Serial.println (" Battery critically low (<3.5), going to sleep");
+    Serial.println(" Battery critically low (<3.5), going to sleep");
     GoToSleep();
   }
   sprintf(TxString, "BP:%d,%d", battpcnt, (battpcnt * BattFullTime) / 100);
