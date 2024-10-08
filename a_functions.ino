@@ -46,28 +46,35 @@ float getFloatADC(int numtimes) {
   return adcavg / numtimes;
 }
 
-void CalibrateADC(String strval) {  //TODO pass string, do float converstion in procedure
-  float BatCalValue = 3.75;   //3.75 is default--TODO--move to defines
-  if (strval.length >0) BatCalValue = atof(strval.c_str());  //stops at first non numeric
-  int numrdgs = 10;  //probably needs to be in squeezer.h TODO
+void CalibrateADC(String strval) {                              //TODO pass string, do float converstion in procedure
+  float BatCalValue = 3.75;                                     //3.75 is default--TODO--move to defines
+  if (strval.length() > 0) BatCalValue = atof(strval.c_str());  //stops at first non numeric
+                                                                // Serial.printf("Use Batt Value of %f volts for calibaration",BatCalValue);
+  int numrdgs = 10;                                             //probably needs to be in squeezer.h TODO
   float adcrdg = getFloatADC(numrdgs);
-    BatSnsFactor = BatCalValue / adcrdg;  // l
-  Serial.printf("Calibrate ADC to %f Volts, CalFactor = %f adcraw average = %f over %d rdgs\n",BatCalValue, BatSnsFactor, adcrdg, numrdgs);  
+  BatSnsFactor = BatCalValue / adcrdg;  // l
+  Serial.printf("Calibrate ADC to %f Volts, CalFactor = %f adcraw average = %f over %d rdgs\n", BatCalValue, BatSnsFactor, adcrdg, numrdgs);
   prefs.putFloat("BatADCScale", BatSnsFactor);
-  //TODO put the 3.75 default  and numrdg in defines 
+  //TODO put the 3.75 default  and numrdg in defines
 }
 void SetSSID(String ValStr) {
-  Serial.println("SetSSID");
-  strcpy(SSstr, ValStr.c_str());
-  prefs.putString("SSID", ValStr);  //store in flash as c++ String
-  Serial.printf("SetSSid string = %s", SSstr);
-  String retstr = prefs.getString("SSID", DefaultSSID);
-  //Serial.printf ("SSID retrived from flash =" + prefs.getString ("SSID"));
+  //S:Valstr; if Valstr ="", then revert to default--is this a good idea??
+  if (ValStr.length() > 0) strcpy(SSstr, ValStr.c_str());
+  else strcpy(SSstr, DefaultSSID.c_str());
+  String tempStr = String(SSstr);    //new or default,
+  prefs.putString("SSID", tempStr);  //store in flash as c++ String
+  Serial.println("SetSSid string = " + tempStr);
   return;
 }
 
 void SetPwd(String ValStr) {
-  Serial.println("SetPWD");
+
+  //S:Valstr; if Valstr ="", then revert to default--is this a good idea??
+  if (ValStr.length() > 0) strcpy(PWDstr, ValStr.c_str());
+  else strcpy(PWDstr, DefaultPWD.c_str());
+  String tempStr = String(PWDstr);  //new or default,
+  prefs.putString("PWD", tempStr);  //store in flash as c++ String
+  Serial.println("SetPWD string = " + tempStr);
   return;
 }
 
@@ -116,7 +123,7 @@ void ConnectWiFi(void) {
   //   Serial.printf("No ssid stored, using default = %s\n", DefaultSSID);
   // }
   WiFi.mode(WIFI_STA);
-  //find ssid, pwd
+  //ssid, password are pointers used by WiFi; they point to SSstr & PWDstr, respectively
   strcpy(SSstr, prefs.getString("SSID", DefaultSSID).c_str());  //SSstr is init in squeezer.h
   strcpy(PWDstr, prefs.getString("PWD", DefaultPWD).c_str());   //PWDstr is init in squeezer.h
   Serial.printf("SSID = %s \n", SSstr);
