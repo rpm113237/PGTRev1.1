@@ -123,6 +123,7 @@ void DoTare(void);
 float getFloatADC(int numtimes);
 void RunTimeCheck(void);
 void ResetSwitch(void);
+void GoToSleep(String DSmsg);         
 
 
 #endif

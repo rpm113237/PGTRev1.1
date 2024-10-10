@@ -22,8 +22,8 @@ void RxStringParse(void) {
 
     if (tagStr == "X") {
       // Serial.printf("X is found, hooray\n");
-      Serial.printf(" Tag 'X' received, Going to Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
-      GoToSleep();
+      //Serial.printf(" Tag 'X' received, Going to Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
+      GoToSleep("App X cmd , Going to Deep Sleep");
     } else if (tagStr == "V") CalibrateADC(valStr);
     else if (tagStr == "S") SetSSID(valStr);
     else if (tagStr == "P") SetPwd(valStr);
@@ -81,15 +81,16 @@ void SetPwd(String ValStr) {
 void ResetSwitch(void) {
 
   if ((digitalRead(StartButton) == LOW)) {
-    Serial.printf("Start button is LOW, Go To Sleep\n");
-    GoToSleep();
+    //Serial.printf("Start button is LOW, Go To Sleep\n");
+    GoToSleep("Start button is LOW, Go To Sleep");
   }
 }
 
 void DoOTA(void) {
   Serial.println("DoOTA");
   ConnectWiFi();
-  Serial.println("Hung up awaiting boot");
+  Serial.println("Connected, hung up awaiting boot");
+  SleepTimerStart = millis() / 1000;  //reset sleep timer, give five minutes to connect
   while (1) {
     server.handleClient();
     ElegantOTA.loop();
@@ -126,22 +127,18 @@ void ConnectWiFi(void) {
   //ssid, password are pointers used by WiFi; they point to SSstr & PWDstr, respectively
   strcpy(SSstr, prefs.getString("SSID", DefaultSSID).c_str());  //SSstr is init in squeezer.h
   strcpy(PWDstr, prefs.getString("PWD", DefaultPWD).c_str());   //PWDstr is init in squeezer.h
-  Serial.printf("SSID = %s \n", SSstr);
-  Serial.printf("PWD = %s \n", PWDstr);
+  //Serial.printf("SSID = %s, Pwd = %s\n", SSstr, PWDstr);
   WiFi.begin(ssid, password);
-  Serial.println("Hello World OTA");
-
+  Serial.printf("Waiting to connect to SSID = %s, Pwd = %s\n", SSstr, PWDstr);
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(ssid);
-  Serial.print("IP address: ");
+  Serial.print("Connected to ; IP Address = ");
+  Serial.print(ssid);
+  // Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-
   server.on("/", []() {
     server.send(200, "text/plain", "Hello from PGT Rev1 ElegantOTA!!!");
   });
@@ -170,30 +167,6 @@ void BLEReconnect(void) {
     setLED(0, clrs.BLUE);
     // do stuff here on connecting
     oldDeviceConnected = deviceConnected;
-  }
-}
-
-
-void FindCalibration() {  //never checked out.
-  //set to something like 50 lbs
-  // set cal factor to rawreading/50 (or whatever)
-  float lclrawval = 0;
-  //float lclcalfactor = 0.0;
-  while (1) {
-    if (scale.is_ready()) {
-      scaleVal = scale.get_units(scaleSamples);
-      // BLETX("HF:%d:R:%.1f", hand_num, 0, scaleVal);  //report max //simulate
-      Serial.printf("scale units reading = %.4f \n", scaleVal);
-    }
-    delay(2000);
-    if (scale.is_ready()) {
-      lclrawval = scale.read_average(scaleSamples);
-      Serial.printf("Read 10X; lcl raw val = %.2f\n", lclrawval);  // print the average of 20 readings from the ADC
-                                                                   // lclcalfactor = (float)scaleVal/lclrawval;
-                                                                   // Serial.printf("suggest cal factor = %.1f\n", lclcalfactor);
-    }
-    delay(2000);
-    Serial.println("****************\n");
   }
 }
 
@@ -252,9 +225,7 @@ void VibSend() {
   clrTxString();
   sprintf(TxString, "M:%.1f,%.1f,%.1f", Force.ForceMax, Force.ForceMin, Force.ForceMean);
   BLETX();
-  // clrTxString();
-  // sprintf(TxString, "MN:%.3f,%.3f", Force.ForceMean, Force.ForceMedian);
-  // BLETX();----median not being sent
+  
 }
 
 void setLED(int btime, int clrarray[3]) {  //incorporate into LEDBlink
@@ -378,18 +349,18 @@ void BatSnsCk(void) {
 
   if (battvoltx100 < 371) UseRedLED = true;
   if (battvoltx100 < 3.5) {
-    Serial.println(" Battery critically low (<3.5), going to sleep");
-    GoToSleep();
+    //Serial.println(" Battery critically low (<3.5), going to sleep");
+    GoToSleep(" Battery critically low (<3.5), going to sleep");
   }
   sprintf(TxString, "BP:%d,%d", battpcnt, (battpcnt * BattFullTime) / 100);
   BLETX();
   //
 }
 
-void GoToSleep(void) {
+void GoToSleep(String DSmsg) {
   scale.power_down();
-  //turn off the leds
-  pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));
+  Serial.println(DSmsg); // tell why shutting down.
+  pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2])); //turn LED's OFF
   pixels.show();  // Send the updated pixel colors to the hardware.
   MorseChar(SHAVE_HAIRCUT);
   //Serial.printf("******Low Battery Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
@@ -496,7 +467,7 @@ void RunTimeCheck() {
     firsttime = false;
   }
   if (runtimeseconds > SleepTimeMax) {
-    Serial.printf("No activity for %lu seconds, go to sleep\n", SleepTimeMax);
-    GoToSleep();
+    //Serial.printf("No activity for %lu seconds, go to sleep\n", SleepTimeMax);
+    GoToSleep("No activity for " + (String)SleepTimeMax + "seconds, go to sleep");
   }
 }
