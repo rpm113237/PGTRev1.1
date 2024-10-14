@@ -161,10 +161,11 @@ void BLEReconnect(void) {
   }
   // connecting
   if (deviceConnected && !oldDeviceConnected) {
-    Serial.println(" setting old device; This should happen once");
-    // pixels.setPixelColor(LEDSelect, pixels.Color(clrs.BLUE[0], clrs.BLUE[1], clrs.BLUE[2]));
-    // pixels.show();  // Send the updated pixel colors to the hardware.
-    setLED(0, clrs.BLUE);
+    Serial.println("Connected; setting old device; This should happen once");
+    strcpy(TxString, ("R:" + REV_LEVEL).c_str());   //send out rev level
+    //TODO this should be BLETX
+    Serial.println(TxString);
+    setLED(0, clrs.BLUE);  //for ledBlink
     // do stuff here on connecting
     oldDeviceConnected = deviceConnected;
   }
@@ -225,7 +226,6 @@ void VibSend() {
   clrTxString();
   sprintf(TxString, "M:%.1f,%.1f,%.1f", Force.ForceMax, Force.ForceMin, Force.ForceMean);
   BLETX();
-  
 }
 
 void setLED(int btime, int clrarray[3]) {  //incorporate into LEDBlink
@@ -359,9 +359,9 @@ void BatSnsCk(void) {
 
 void GoToSleep(String DSmsg) {
   scale.power_down();
-  Serial.println(DSmsg); // tell why shutting down.
-  pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2])); //turn LED's OFF
-  pixels.show();  // Send the updated pixel colors to the hardware.
+  Serial.println(DSmsg);                                                                 // tell why shutting down.
+  pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));  //turn LED's OFF
+  pixels.show();                                                                         // Send the updated pixel colors to the hardware.
   MorseChar(SHAVE_HAIRCUT);
   //Serial.printf("******Low Battery Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
   esp_deep_sleep_enable_gpio_wakeup(1 << StartButton, ESP_GPIO_WAKEUP_GPIO_LOW);

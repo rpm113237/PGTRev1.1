@@ -11,6 +11,7 @@
 #define SHAVE_HAIRCUT 0x1b  //use esc for shave and haircut
 
 
+
 RTC_DATA_ATTR int bootCount = 0;   //keep track of how many times since power on
 
 
@@ -106,6 +107,7 @@ const char* ssid = SSstr;
 const char* password = PWDstr;
 String DefaultSSID = "McClellan_Workshop";
 String DefaultPWD = "Rangeland1";
+String REV_LEVEL = "dv1.0";     //actually, include last part of commit number
 
 //protos
 void setLED(int LedNo, int btime, int clrarray[]);

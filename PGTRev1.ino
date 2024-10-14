@@ -77,6 +77,7 @@ class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
     Serial.println("Device Connected!!");
+   
   };
 
   void onDisconnect(BLEServer* pServer) {
@@ -119,7 +120,8 @@ void setup() {
   // initialize serial communication at 115200 bits per second:
   u_long lagmsStart = millis();
   Serial.begin(115200);
-  Serial.printf("\nHello from Protocol Grip Trainer v25Jul24, time = \t%lu ms\n", (millis() - lagmsStart));
+  //Serial.printf("\nHello from Protocol Grip Trainer v25Jul24, time = \t%lu ms\n", (millis() - lagmsStart));
+  Serial.println ("Hello; PGT RevLevel =" +REV_LEVEL);
 
   ledcAttach(buzzPin, freq, resolution);  //eight bit resolution--why? (Jun24?); using for PWM
   setLED(00, clrs.GREEN);
@@ -222,7 +224,10 @@ void setup() {
 
   } else {
     Serial.printf("****end of setup; BLE connected****\n");
+    strcpy(TxString ,("R:" + REV_LEVEL).c_str()); 
+    Serial.println(TxString);
     setLED(0, clrs.BLUE);  //for ledBlink
+
   }
   SleepTimer = 0;
   SleepTimerStart = millis() / 1000;  //reset the sleeptimers
