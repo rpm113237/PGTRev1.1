@@ -121,15 +121,15 @@ void setup() {
   u_long lagmsStart = millis();
   Serial.begin(115200);
   //Serial.printf("\nHello from Protocol Grip Trainer v25Jul24, time = \t%lu ms\n", (millis() - lagmsStart));
-  Serial.println ("Hello; PGT RevLevel =" +REV_LEVEL);
+  Serial.println ("Hello; PGT RevLevel =" + REV_LEVEL);
+  //NewBLE(SndBle, SndSer, "R:"+ REV_LEVEL); SndBle, SndSer bool, Arg is String(); this sends both.
 
   ledcAttach(buzzPin, freq, resolution);  //eight bit resolution--why? (Jun24?); using for PWM
   setLED(00, clrs.GREEN);
   LEDBlink();  //Give them a green.
-  print_wakeup_reason();
+  print_wakeup_reason();    //store wakeup count
   Soundwakeup();  //wake up feedback
   //Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));
-
   pinMode(StartButton, INPUT);
 
   //start the TickTwo timers
@@ -203,6 +203,8 @@ void setup() {
   oldmillis = millis();
   el_time = millis() - oldmillis;
   setLED(500, clrs.BLUE);
+
+  //Big Question:  What is the purpose of running the scale if no BLE connection?  Why not go directly to loop??
 
   Serial.print("Connecting (BLE)\n");
   BlinkTime = CNCT_LED_BLINK_TIME;

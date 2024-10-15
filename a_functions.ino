@@ -1,15 +1,10 @@
 void RxStringParse(void) {
 
   String tagStr, valStr;  //C:12.3; C is tag, 12.3 is val
-  // if ((digitalRead(StartButton) == LOW)) {
-  //   Serial.printf("Start button is LOW, Go To Sleep\n");
-  //   GoToSleep();
-  // }
-
+  
   if ((rxValue.length() > 0)) {  //nothing to do if len = 0
     Serial.println("rxValue " + rxValue);
     int indxsemi = rxValue.indexOf(':');
-    //Serial.printf("Index of semi colon is %d\n", indxsemi);
     if (indxsemi < 0) indxsemi = 1;  // make it work for single tags w/o semi
     tagStr = rxValue.substring(0, indxsemi);
     tagStr.toUpperCase();
