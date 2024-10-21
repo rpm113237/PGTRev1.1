@@ -1,7 +1,7 @@
 void RxStringParse(void) {
 
   String tagStr, valStr;  //C:12.3; C is tag, 12.3 is val
-  
+
   if ((rxValue.length() > 0)) {  //nothing to do if len = 0
     Serial.println("rxValue " + rxValue);
     int indxsemi = rxValue.indexOf(':');
@@ -157,7 +157,7 @@ void BLEReconnect(void) {
   // connecting
   if (deviceConnected && !oldDeviceConnected) {
     Serial.println("Connected; setting old device; This should happen once");
-    strcpy(TxString, ("R:" + REV_LEVEL).c_str());   //send out rev level
+    strcpy(TxString, ("R:" + REV_LEVEL).c_str());  //send out rev level
     //TODO this should be BLETX
     Serial.println(TxString);
     setLED(0, clrs.BLUE);  //for ledBlink
@@ -219,7 +219,8 @@ void clrTxString(void) {
 
 void VibSend() {
   clrTxString();
-  sprintf(TxString, "M:%.1f,%.1f,%.1f", Force.ForceMax, Force.ForceMin, Force.ForceMean);
+  //sprintf(TxString, "M:%.1f,%.1f,%.1f", Force.ForceMax, Force.ForceMin, Force.ForceMean);
+  sprintf(TxString, "M:%.1f", Force.ForceMean);
   BLETX();
 }
 
@@ -257,7 +258,19 @@ void LEDBlink() {
   pixels.show();
 }
 
+void NewBLETX(bool SndBLE, String(StrToSnd)) {
 
+  //if connected and SndBLE tagged, send BLE
+  
+  if (deviceConnected && SndBLE) {  //snd ble and serial
+    if (StrToSnd.length() < 20) {   //don't try to send more than 20 over BLE
+      pTxCharacteristic->setValue(StrToSnd.c_str());
+      pTxCharacteristic->notify();
+      Serial.println("BLE\t" + StrToSnd);
+    }
+    else Serial.println("string length too long: "+ (String)(StrToSnd.length()) + " chars:  " + StrToSnd);
+  } else Serial.println("OFFLine\t" + StrToSnd);    //any length can be sent off line
+}
 
 void BLETX(void) {
 
@@ -351,6 +364,8 @@ void BatSnsCk(void) {
   BLETX();
   //
 }
+
+
 
 void GoToSleep(String DSmsg) {
   scale.power_down();

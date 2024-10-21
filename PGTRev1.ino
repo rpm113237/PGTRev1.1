@@ -17,7 +17,6 @@
 #include <Preferences.h>
 Preferences prefs;
 
-
 //OTA includes--taken from ElegantOTA demo example
 #include <WiFi.h>
 #include <WiFiClient.h>
