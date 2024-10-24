@@ -1,11 +1,13 @@
 void RxStringParse(void) {
 
-  String tagStr, valStr;  //C:12.3; C is tag, 12.3 is val
+  String tagStr = "";
+  String valStr = "";
+  ;  //C:12.3; C is tag, 12.3 is val
 
   if ((rxValue.length() > 0)) {  //nothing to do if len = 0
     Serial.println("rxValue " + rxValue);
-    int indxsemi = rxValue.indexOf(':');
-    if (indxsemi < 0) indxsemi = 1;  // make it work for single tags w/o semi
+    int indxsemi = rxValue.indexOf(':');            //-1 if no semi
+    if (indxsemi < 0) indxsemi = rxValue.length();  // make it work for single tags w/o semi
     tagStr = rxValue.substring(0, indxsemi);
     tagStr.toUpperCase();
     //Serial.print("tagstring upper = ");
@@ -15,23 +17,42 @@ void RxStringParse(void) {
     } else valStr = "";  //null for checking
 
 
-    if (tagStr == "X") {
-      // Serial.printf("X is found, hooray\n");
-      //Serial.printf(" Tag 'X' received, Going to Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
-      GoToSleep("App X cmd , Going to Deep Sleep");
-    } else if (tagStr == "V") CalibrateADC(valStr);
+    if (tagStr == "X") GoToSleep("App X cmd , Going to Deep Sleep");
     else if (tagStr == "S") SetSSID(valStr);
     else if (tagStr == "P") SetPwd(valStr);
     else if (tagStr == "O") DoOTA();
     else if (tagStr == "C") CalibrateScale(valStr);
-    else if (tagStr == "T") DoTare();  //not sure why we need this
-
-    else {
-      Serial.println("Unknown Tag =" + tagStr);
-    }
+    else if (tagStr == "TR") DoTare();  //not sure why we need this
+    else if (tagStr == "FRQ")SetFFRate(valStr);  //Start sending FF data at rate int valstr
+    else if (tagStr == "BP") BatSnsCk();    // query only.
+    else if (tagStr == "ET") SetEpochTime(valStr);
+    else if (tagStr == "R") StringBLETX("R:" + REV_LEVEL );   
+    else Serial.println("Unknown Tag =" + tagStr);
     rxValue.clear();  //erases
   }
 }
+
+void SetFFRate(String valStr) {  
+  
+   if (valStr.length() > 0) {
+    Force.FFRate = atoi(valStr.c_str());
+    Force.FFReportTime = 1000/Force.FFRate;   //this could be made settable.
+    Force.FFReport = true; 
+    Force.EpochStart = millis();
+    Force.EpochTime = millis()-Force.EpochStart;
+    //if samp rate = 80; rate = 2--> scaleSamples = 40
+  } else{Force.FFReport = false;  //if sample rate = 10, rate = 2, scaleSamples = 5
+  }
+}
+
+void SetEpochTime(String valStr) {
+  //set EpochTime to valStr; if ValStr = null, set it to zero
+  if (valStr.length() > 0) {
+    EpochTime = atoi(valStr.c_str());
+  } else EpochTime = 0;
+}
+
+
 float getFloatADC(int numtimes) {
   float adcavg = 0.0;
   int i;  //old FORTRAN pgmr
@@ -166,6 +187,14 @@ void BLEReconnect(void) {
   }
 }
 
+float cumAvg(float oldAvg, float newForce, int NumSamps) {
+  /*calculates cum avg ca(n+1)= ca(n)+ (hf(n+1)-ca(n))/(n+1)
+  where n is the number of samples==samprate * seconds for mean
+  */
+  // ForceMean = ForceMean + (force-ForceMean)/(scaleSamples);
+  return oldAvg + (newForce - oldAvg) / (NumSamps + 1);
+}
+
 int floatcomp(const void* elem1, const void* elem2) {
   if (*(const float*)elem1 < *(const float*)elem2)
     return -1;
@@ -173,40 +202,58 @@ int floatcomp(const void* elem1, const void* elem2) {
 }
 
 void CheckForce(void) {  //PGT1 changed
-  int i = 0;             //force array index
-  int arraysz = sizeof(Force.ForceArray) / sizeof(Force.ForceArray[0]);
-  if (scale.is_ready()) {  //.get_units is blocking.
-    scaleVal = scale.get_units(scaleSamples);
-    if (scaleVal > MinForce) SleepTimerStart = millis() / 1000;  //reset sleep timer.
-    for (i = (arraysz - 1); i > 0; i--) {
-      Force.ForceArray[i] = Force.ForceArray[i - 1];  //move everything up one spot
-    }
-    Force.ForceArray[0] = scaleVal;
-    //now find max, min, mean
-    Force.ForceMax = scaleVal;
-    Force.ForceMin = scaleVal;
-    Force.ForceMean = 0;
-    for (i = 0; i < arraysz; i++) {
-      if (Force.ForceArray[i] > Force.ForceMax) Force.ForceMax = Force.ForceArray[i];
-      if (Force.ForceArray[i] < Force.ForceMin) Force.ForceMin = Force.ForceArray[i];
-      Force.ForceMean += Force.ForceArray[i];
-    }
 
-    Force.ForceMean = Force.ForceMean / arraysz;
-    float wkarray[FORCE_ARRAY_LEN];  //temp array for sorting
+  if (scale.is_ready()) {           //.get_units is blocking.
+    scaleVal = scale.get_units(1);  //get samples as fast as available
+    
+    Force.BaseVal = scaleVal;
+    Force.FFVal = cumAvg(Force.FFVal, scaleVal, Force.BaseRate / Force.FFRate);
+    Force.HFVal = cumAvg(Force.HFVal, scaleVal, Force.BaseRate / Force.HFRate);
+    Force.MeanVal = cumAvg(Force.MeanVal, scaleVal, Force.BaseRate * Force.BaseRate);
+    if (Force.HFVal > MinForce) SleepTimerStart = millis() / 1000;  //reset sleep timer.Reset this on HF; base rate may be pretty noisy
+    
+  }
+}
 
-    for (i = 0; i < arraysz; i++) wkarray[i] = Force.ForceArray[i];
-    qsort(wkarray, arraysz, sizeof(float), floatcomp);
-    //   Serial.printf("  sorted\t");
-    //  for(i = 0; i < 10; i++)
-    //     Serial.printf("%.3f\t", wkarray[i]);
-    //  Serial.printf("\n");
-    if (arraysz % 2 == 0) Force.ForceMedian = (wkarray[arraysz / 2] + wkarray[arraysz / 2 + 1]) / 2;
-    else Force.ForceMedian = wkarray[arraysz / 2 + 1];
+void MeanSend(void) {
+  //called every millisecond, actually sends every MeanTime*1000
+  unsigned long elmillis;
+  if(!Force.MeanReport)return;
+  elmillis= millis()-Force.MeanLastReport;  //incremented every call--which is once per ms
+  if (elmillis >= Force.MeanReportTime) {
+    Force.MeanLastReport = millis(); 
+    Serial.printf("Meansend, Elapsed ms = %lu\n", elmillis);   //diagnostic   
+    StringBLETX("M:" + String(Force.MeanVal));  //note that this can be stale by up to 1ms.
+    
+  }  //sends out mean if mean interval has elapsed
+}
 
-    clrTxString();
-    sprintf(TxString, "HF:%.1f", scaleVal);
-    BLETX();  //transmits TxString
+
+void FFSend(void) {  //TODO--this has to be in Carter's Format
+  // rate = FFReport time--default 100ms??
+  static unsigned long milliscount = 0;
+  if (!Force.FFReport) return;   //ReportFF is set by 
+  milliscount++;  //incremented every call--which is once per ms
+  if (milliscount >= Force.FFReportTime) {
+    StringBLETX("FF:" + String(Force.HFVal));
+    milliscount = 0;
+  }
+}
+
+
+
+
+void HFSend(void) {
+  // rate = HFReport time--default 200ms
+  unsigned long elmillis = 0;
+  if(!Force.HFReport) return;
+  //Serial.printf("HFsend, ms = %d\n", milliscount);
+  //milliscount++;  //incremented every call--which is once per ms
+  elmillis = (millis()-Force.HFLastReport);
+  if ( elmillis>= Force.HFReportTime) {
+    Force.HFLastReport = millis();
+    Serial.printf("HFsend, Elapsed ms = %lu\n", elmillis);   //diagnostic
+    StringBLETX("HF:" + String(Force.HFVal));    
   }
 }
 
@@ -217,12 +264,12 @@ void clrTxString(void) {
   for (i = 0; i < Txsize; i++) TxString[i] = 0x00;  //needs cleared for some reason.
 }
 
-void VibSend() {
-  clrTxString();
-  //sprintf(TxString, "M:%.1f,%.1f,%.1f", Force.ForceMax, Force.ForceMin, Force.ForceMean);
-  sprintf(TxString, "M:%.1f", Force.ForceMean);
-  BLETX();
-}
+// void VibSend() {
+//   clrTxString();
+//   //sprintf(TxString, "M:%.1f,%.1f,%.1f", Force.ForceMax, Force.ForceMin, Force.ForceMean);
+//   sprintf(TxString, "M:%.1f", Force.MeanForce);
+//   BLETX();
+// }
 
 void setLED(int btime, int clrarray[3]) {  //incorporate into LEDBlink
   int i = 0;
@@ -258,30 +305,18 @@ void LEDBlink() {
   pixels.show();
 }
 
-void NewBLETX(bool SndBLE, String(StrToSnd)) {
 
-  //if connected and SndBLE tagged, send BLE
-  
-  if (deviceConnected && SndBLE) {  //snd ble and serial
-    if (StrToSnd.length() < 20) {   //don't try to send more than 20 over BLE
-      pTxCharacteristic->setValue(StrToSnd.c_str());
-      pTxCharacteristic->notify();
-      Serial.println("BLE\t" + StrToSnd);
-    }
-    else Serial.println("string length too long: "+ (String)(StrToSnd.length()) + " chars:  " + StrToSnd);
-  } else Serial.println("OFFLine\t" + StrToSnd);    //any length can be sent off line
-}
-
-void BLETX(void) {
-
-  if (strlen(TxString) > 19) Serial.println("String >19, truncated");
+void StringBLETX(String msg) {
+  if (msg.length() > 19) Serial.println("String too long, truncated, length = " + String(msg.length()));
   if (deviceConnected) {
-    pTxCharacteristic->setValue(TxString);
+    pTxCharacteristic->setValue(msg.c_str());
     pTxCharacteristic->notify();
-    Serial.printf("BLE\t%20s\n", TxString);
-    // bluetooth stack will go into congestion, if too many packets are sent
-  } else Serial.printf("OFFline\t%20s\n", TxString);
+    Serial.println("BLE:" + msg);
+    // bluetooth stack will go into congestion, if too many packets are sent  }
+      }
+      else Serial.println("OFFline:" + msg);  //maybe need a debug switch
 }
+
 
 
 void print_wakeup_reason() {
@@ -360,8 +395,9 @@ void BatSnsCk(void) {
     //Serial.println(" Battery critically low (<3.5), going to sleep");
     GoToSleep(" Battery critically low (<3.5), going to sleep");
   }
-  sprintf(TxString, "BP:%d,%d", battpcnt, (battpcnt * BattFullTime) / 100);
-  BLETX();
+  StringBLETX("BP:"+String(battpcnt)+String((battpcnt * BattFullTime) / 100));
+  // sprintf(TxString, "BP:%d,%d", battpcnt, (battpcnt * BattFullTime) / 100);
+  // BLETX();
   //
 }
 
@@ -481,3 +517,4 @@ void RunTimeCheck() {
     GoToSleep("No activity for " + (String)SleepTimeMax + "seconds, go to sleep");
   }
 }
+

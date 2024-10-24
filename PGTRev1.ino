@@ -34,9 +34,15 @@ static const BaseType_t app_cpu = 1;
 
 
 // define ledticker, battchecker, vibReport--have to have protos in .h
+//MeanReport, etc. is called every millis; Actual sending is a timer in the sub
+//Haven't looked at library, but I think the call rate of TickTwo isn't modifieable
+
 TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);  //calls LEDBlink, called every 10MS, repeats forever, resolution MS
 
-TickTwo VibReport(VibSend, VIB_SND_INTERVAL, 0, MILLIS);  //send vibration data every VIB_SND_INTERVAL (ms), forever
+TickTwo MeanReport(MeanSend, 1, 0, MILLIS);  //send vibration data every VIB_SND_INTERVAL (ms), forever
+TickTwo HFReport(HFSend, 1, 0, MILLIS);
+TickTwo FFReport(FFSend, 1, 0, MILLIS);
+
 
 TickTwo BattChecker(BatSnsCk, Batt_CK_Interval, 0, MILLIS);  //checks battery every Batt_Ck_Interval
 
@@ -76,7 +82,6 @@ class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     deviceConnected = true;
     Serial.println("Device Connected!!");
-   
   };
 
   void onDisconnect(BLEServer* pServer) {
@@ -120,21 +125,23 @@ void setup() {
   u_long lagmsStart = millis();
   Serial.begin(115200);
   //Serial.printf("\nHello from Protocol Grip Trainer v25Jul24, time = \t%lu ms\n", (millis() - lagmsStart));
-  Serial.println ("Hello; PGT RevLevel =" + REV_LEVEL);
+  Serial.println("Hello; PGT RevLevel =" + REV_LEVEL);
   //NewBLE(SndBle, SndSer, "R:"+ REV_LEVEL); SndBle, SndSer bool, Arg is String(); this sends both.
 
   ledcAttach(buzzPin, freq, resolution);  //eight bit resolution--why? (Jun24?); using for PWM
   setLED(00, clrs.GREEN);
-  LEDBlink();  //Give them a green.
-  print_wakeup_reason();    //store wakeup count
-  Soundwakeup();  //wake up feedback
+  LEDBlink();             //Give them a green.
+  print_wakeup_reason();  //store wakeup count
+  Soundwakeup();          //wake up feedback
   //Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));
   pinMode(StartButton, INPUT);
 
   //start the TickTwo timers
-  LEDtimer.start();      //start LED timer
-  BattChecker.start();   //start Batt checker
-  VibReport.start();     //start Vib report
+  LEDtimer.start();     //start LED timer
+  //BattChecker.start();  //start Batt checker
+  MeanReport.start();   //start Mean  report
+  FFReport.start();
+  HFReport.start();
   SleepChecker.start();  //start sleepchecker
 
   // Create the BLE Device
@@ -225,25 +232,27 @@ void setup() {
 
   } else {
     Serial.printf("****end of setup; BLE connected****\n");
-    strcpy(TxString ,("R:" + REV_LEVEL).c_str()); 
+    strcpy(TxString, ("R:" + REV_LEVEL).c_str());
     Serial.println(TxString);
     setLED(0, clrs.BLUE);  //for ledBlink
-
   }
   SleepTimer = 0;
   SleepTimerStart = millis() / 1000;  //reset the sleeptimers
+  EpochTimeStart = millis();
 }
 
 void loop() {
-
+  CheckForce();  //check force updates force structure
   BattChecker.update();   // BatSnsCk checks battery, sends voltage
   LEDtimer.update();      //should call the ledBlink every 10ms.
-  VibReport.update();     //
+  FFReport.update();      //sends out FF data current FF Force, current EpochTime= millis()-EpochTimeStart
+  HFReport.update();      //send out HoldForce as HF:(String(Force.HFVal))
+  MeanReport.update();    // MeanReport
   SleepChecker.update();  //check for timeout
-  ResetSwitch();
-  RxStringParse();
-  BLEReconnect();  //TODO does this work???
-  CheckForce();    //check force does the sending.
+  ResetSwitch();          //check for OFF
+  RxStringParse();        //check for orders from the boss (App)
+  BLEReconnect();         //TODO does this work???
+
   //RunTimeCheck();  //checks timeouts, etc.
 
 
