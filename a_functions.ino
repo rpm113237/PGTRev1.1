@@ -45,6 +45,10 @@ void SetFFRate(String valStr) {
   }
 }
 
+unsigned long getEpochTime(void){
+  return (millis()- Force.EpochStart); 
+}
+
 void SetEpochTime(String valStr) {
   //set EpochTime to valStr; if ValStr = null, set it to zero
   if (valStr.length() > 0) {
@@ -192,14 +196,16 @@ float cumAvg(float oldAvg, float newForce, int NumSamps) {
   where n is the number of samples==samprate * seconds for mean
   */
   // ForceMean = ForceMean + (force-ForceMean)/(scaleSamples);
-  return oldAvg + (newForce - oldAvg) / (NumSamps + 1);
+  float newavg = oldAvg + (newForce - oldAvg) / (NumSamps + 1);
+  //Serial.printf("\toldavg = %.2f\tnewForce = %.2f\tSamps =%d\tNewAvg = %.2f\n", oldAvg,newForce, NumSamps, newavg);
+  return newavg;
 }
 
-int floatcomp(const void* elem1, const void* elem2) {
-  if (*(const float*)elem1 < *(const float*)elem2)
-    return -1;
-  return *(const float*)elem1 > *(const float*)elem2;
-}
+// int floatcomp(const void* elem1, const void* elem2) {
+//   if (*(const float*)elem1 < *(const float*)elem2)
+//     return -1;
+//   return *(const float*)elem1 > *(const float*)elem2;
+// }
 
 void CheckForce(void) {  //PGT1 changed
 
@@ -209,7 +215,7 @@ void CheckForce(void) {  //PGT1 changed
     Force.BaseVal = scaleVal;
     Force.FFVal = cumAvg(Force.FFVal, scaleVal, Force.BaseRate / Force.FFRate);
     Force.HFVal = cumAvg(Force.HFVal, scaleVal, Force.BaseRate / Force.HFRate);
-    Force.MeanVal = cumAvg(Force.MeanVal, scaleVal, Force.BaseRate * Force.BaseRate);
+    Force.MeanVal = cumAvg(Force.MeanVal, scaleVal, Force.BaseRate * Force.MeanTime);
     if (Force.HFVal > MinForce) SleepTimerStart = millis() / 1000;  //reset sleep timer.Reset this on HF; base rate may be pretty noisy
     
   }
@@ -222,7 +228,7 @@ void MeanSend(void) {
   elmillis= millis()-Force.MeanLastReport;  //incremented every call--which is once per ms
   if (elmillis >= Force.MeanReportTime) {
     Force.MeanLastReport = millis(); 
-    Serial.printf("Meansend, Elapsed ms = %lu\n", elmillis);   //diagnostic   
+    Serial.printf("\tMeansend, Elapsed ms = %lu\t", elmillis);   //diagnostic   
     StringBLETX("M:" + String(Force.MeanVal));  //note that this can be stale by up to 1ms.
     
   }  //sends out mean if mean interval has elapsed
@@ -231,12 +237,15 @@ void MeanSend(void) {
 
 void FFSend(void) {  //TODO--this has to be in Carter's Format
   // rate = FFReport time--default 100ms??
-  static unsigned long milliscount = 0;
-  if (!Force.FFReport) return;   //ReportFF is set by 
-  milliscount++;  //incremented every call--which is once per ms
-  if (milliscount >= Force.FFReportTime) {
-    StringBLETX("FF:" + String(Force.HFVal));
-    milliscount = 0;
+  
+  unsigned long elmillis= millis()-Force.FFLastReport;  
+  if (!Force.FFReport) return;   //ReportFF is set/reset by FRQ:XXXX   
+  if (elmillis >= Force.FFReportTime) {
+    Force.FFLastReport =millis();
+    Serial.printf("\tFFsend: FF = %.2f\tElapsed ms = %lu\t", Force.FFVal, elmillis);   //diagnostic
+    Serial.printf("Epoch Time = %lu\t", getEpochTime());
+    StringBLETX("FF:" + String(getEpochTime())+ String(Force.FFVal));
+    
   }
 }
 
@@ -263,13 +272,6 @@ void clrTxString(void) {
   Txsize = sizeof(TxString) / sizeof(TxString[0]);
   for (i = 0; i < Txsize; i++) TxString[i] = 0x00;  //needs cleared for some reason.
 }
-
-// void VibSend() {
-//   clrTxString();
-//   //sprintf(TxString, "M:%.1f,%.1f,%.1f", Force.ForceMax, Force.ForceMin, Force.ForceMean);
-//   sprintf(TxString, "M:%.1f", Force.MeanForce);
-//   BLETX();
-// }
 
 void setLED(int btime, int clrarray[3]) {  //incorporate into LEDBlink
   int i = 0;
@@ -309,12 +311,13 @@ void LEDBlink() {
 void StringBLETX(String msg) {
   if (msg.length() > 19) Serial.println("String too long, truncated, length = " + String(msg.length()));
   if (deviceConnected) {
-    pTxCharacteristic->setValue(msg.c_str());
+    pTxCharacteristic->setValue(msg);
     pTxCharacteristic->notify();
-    Serial.println("BLE:" + msg);
+    Serial.println("BLE:\t" + msg);
+    //delay(1000);
     // bluetooth stack will go into congestion, if too many packets are sent  }
       }
-      else Serial.println("OFFline:" + msg);  //maybe need a debug switch
+      else Serial.println("OFFline:\t" + msg);  //maybe need a debug switch
 }
 
 
@@ -518,3 +521,13 @@ void RunTimeCheck() {
   }
 }
 
+void timesInit(void){
+  SleepTimer = 0;
+  SleepTimerStart = millis() / 1000;  //reset the sleeptimers
+  Force.EpochStart = millis();
+  Force.FFLastReport = millis();
+  Force.HFLastReport = millis();
+  Force.MeanLastReport = millis();
+
+  
+}

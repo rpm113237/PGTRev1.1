@@ -5,10 +5,18 @@
 
 //#define DEBUGSQUEEZER  //comment this out for real run times
 #define CNCT_LED_BLINK_TIME 1000  //BLINK TIME FOR CONNECT LED
-
 #define MS_TO_SEC 1000               //convert to secs
-#define CONN_WAIT_TM 10 * MS_TO_SEC  //time to wait to connect
+#define CONN_WAIT_TM 25 * MS_TO_SEC  //time to wait to connect
 #define SHAVE_HAIRCUT 0x1b           //use esc for shave and haircut
+
+String REV_LEVEL = "dv1.0";  //actually, include last part of commit number
+const int DefaultBaseRate = 10;// samples persecond
+const int DefaultFFRate = 10;// samples persecond
+const int DefaultHFRate = 5; //samples per second
+const int DefaultMeanTime = 2;
+String DefaultSSID = "McClellan_Workshop";
+String DefaultPWD = "Rangeland1";
+
 
 
 
@@ -18,7 +26,7 @@ RTC_DATA_ATTR int bootCount = 0;  //keep track of how many times since power on 
 unsigned long oldmillis;        //to time the states
 unsigned long int el_time = 0;  //elapsed time
 unsigned long EpochTime;    //for FF reporting
-unsigned long EpochTimeStart;
+//unsigned long EpochTimeStart;
 
 float scaleVal = 0.0;           //scale data
 float scaleCalVal = 8545.85;    //replace with typical number.
@@ -30,11 +38,7 @@ char TxString[25];  // used to transmit
 //HX711 pins:
 const int HX711_dout = 7;  //mcu > HX711 dout pin
 const int HX711_sck = 3;   //mcu > HX711 sck pin
-// const int scaleSamples = 10;
-int scaleSamples = 2;  // this is calculated from
-const int DefaultFFRate = 10;// samples persecond
 
-const int SampleRate = 10;  // Samples per second TODO--this needs to be changed to 80.  or a define on hw rev level.
 
 struct ForceStruct{  
   /* Force is accumulated and averages calculated based on scale. Reporting is synchronous tied to TickTwo
@@ -42,10 +46,10 @@ struct ForceStruct{
   */ 
   unsigned long EpochStart;	//Start of PGT EpochStart
   unsigned long EpochTime; //in ms == millis()-EpochStartTime
-  int BaseRate = 80;    //for Rev1--10 BASERATE #define 80
+  int BaseRate = DefaultBaseRate;    //for Rev1--10 BASERATE #define 80
   float BaseVal;  //updated every sample
   bool FFReport = true;
-  int FFRate = 10;  //samples/sec
+  int FFRate = DefaultFFRate;  //samples/sec
   int FFReportTime = 100; //report at this rate (ms)
   unsigned long FFLastReport;	//millis of last report
   float FFVal;    //moving average over last BaseRate/FFRate Samples
@@ -101,15 +105,13 @@ float Batt_OK_Lvl = 3.5;
 float Batt_LO_Lvl = 3.3;
 float BatMultDefault = 0.001019;  //TODO -find the nominal value
 float BatSnsFactor = 0.0;
-
 const int Batt_CK_Interval = 60 * MS_TO_SEC;
 #define Battmah 1000
 #define Runmah 70
 #define BattFullTime (Battmah / Runmah) * 60  //in minutes
 
-//StartSwitch--TODO--second switch, if needed.
+
 const int StartButton = 1;  //
-//const int LongClickTime = 3000; // time for long click to shut down?
 const int FastPin = 18;  //set =1 for 80 samplses/sec
 
 uint16_t SleepTimer;          // in seconds reset if HF> MinForce
@@ -125,9 +127,7 @@ char SSstr[25] = "McClellan_Workshop";  //max from ble is about 20(?)- 2 for tag
 char PWDstr[25] = "Rangeland1";
 const char* ssid = SSstr;
 const char* password = PWDstr;
-String DefaultSSID = "McClellan_Workshop";
-String DefaultPWD = "Rangeland1";
-String REV_LEVEL = "dv1.0";  //actually, include last part of commit number
+
 
 //protos
 void setLED(int LedNo, int btime, int clrarray[]);
@@ -152,6 +152,7 @@ void HFSend (void);
 void FFSend (void);
 void print_wakeup_reason();
 void Soundwakeup(void);
+void timesInit(void);
 
 
 #endif

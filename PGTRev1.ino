@@ -236,10 +236,10 @@ void setup() {
     Serial.println(TxString);
     setLED(0, clrs.BLUE);  //for ledBlink
   }
-  SleepTimer = 0;
-  SleepTimerStart = millis() / 1000;  //reset the sleeptimers
-  EpochTimeStart = millis();
+  timesInit(); //
 }
+
+
 
 void loop() {
   CheckForce();  //check force updates force structure
