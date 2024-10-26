@@ -77,14 +77,11 @@ const int ledChannel = 0;
 const int resolution = 8;
 const int dutycycle = 127;  //50 percent +/-
 const int buzzPin = 19;
-// const int LEDRED = 4;     //RED LED HIGH = ON
-// const int LEDBLUE = 5;    //BLUE LED HIGH = ON
-bool UseRedLED = false;   //if true, light off red  TODO--overhaul SetLED
-// bool UseBlueLED = false;  //if true, light off blue led
 
 const int NEOPIN = 8;                                               //
 const int NEOPIXELS = 2;                                            //two led's
 Adafruit_NeoPixel pixels(NEOPIXELS, NEOPIN, NEO_GRB + NEO_KHZ800);  //2 ea sk6812 on pin 8
+
 struct COLORS {
   int RED[3] = { 255, 0, 0 };
   int GREEN[3] = { 0, 255, 0 };
@@ -106,7 +103,7 @@ float Batt_OK_Lvl = 3.5;
 float Batt_LO_Lvl = 3.3;
 float BatMultDefault = 0.001019;  //TODO -find the nominal value
 float BatSnsFactor = 0.0;
-const int Batt_CK_Interval = 60 * MS_TO_SEC;
+const int Batt_CK_Interval = 100 * MS_TO_SEC;
 #define Battmah 1000
 #define Runmah 70
 #define BattFullTime (Battmah / Runmah) * 60  //in minutes
@@ -135,7 +132,7 @@ void setLED(int LedNo, int btime, int clrarray[]);
 void VibSend(void);
 void BLETX(void);
 void LEDBlink(void);
-void BatSnsCk(void);
+String BatSnsCk(void);
 void SoundBuzz(u_long cwFreq = 2500, int sound_ms = 100);
 void CalibrateADC(String strval);
 void SetSSID(String ValStr);

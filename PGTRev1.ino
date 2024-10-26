@@ -138,7 +138,7 @@ void setup() {
 
   //start the TickTwo timers
   LEDtimer.start();     //start LED timer
-  //BattChecker.start();  //start Batt checker
+  BattChecker.start();  //start Batt checker
   MeanReport.start();   //start Mean  report
   FFReport.start();
   HFReport.start();
@@ -216,13 +216,12 @@ void setup() {
   BlinkTime = CNCT_LED_BLINK_TIME;
   setLED(250, clrs.BLUE);     //blinking for connect
   Serial.println("Revision level = " + REV_LEVEL);
-  BatSnsCk();  //sets color for connect led
+  Serial.println(BatSnsCk());  //sets color for connect led
   
   timesInit(); //
 }
 
-
-
+//**************loop()***************************************
 void loop() {
   CheckForce();  //check force updates force structure
   BattChecker.update();   // BatSnsCk checks battery, doesn't send voltage--voltage send is query
@@ -234,9 +233,4 @@ void loop() {
   ResetSwitch();          //check for OFF
   RxStringParse();        //check for orders from the boss (App)
   BLEReconnect();         //TODO does this work???
-
-  //RunTimeCheck();  //checks timeouts, etc.
-
-
-
 }  //end of loop

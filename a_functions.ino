@@ -5,7 +5,7 @@ void RxStringParse(void) {
   ;  //C:12.3; C is tag, 12.3 is val
 
   if ((rxValue.length() > 0)) {  //nothing to do if len = 0
-    Serial.println("rxValue " + rxValue);
+    //Serial.println("rxValue " + rxValue);
     int indxsemi = rxValue.indexOf(':');            //-1 if no semi
     if (indxsemi < 0) indxsemi = rxValue.length();  // make it work for single tags w/o semi
     tagStr = rxValue.substring(0, indxsemi);
@@ -24,7 +24,7 @@ void RxStringParse(void) {
     else if (tagStr == "C") CalibrateScale(valStr);
     else if (tagStr == "TR") DoTare();            //not sure why we need this
     else if (tagStr == "FRQ") SetFFRate(valStr);  //Start sending FF data at rate int valstr
-    else if (tagStr == "BP") BatSnsCk();          // query only.
+    else if (tagStr == "BP") StringBLETX(BatSnsCk());          // query only.
     else if (tagStr == "ET") SetEpochTime(valStr);
     else if (tagStr == "R") StringBLETX("R:" + REV_LEVEL);  // this is a report--
     else Serial.println("Unknown Tag =" + tagStr);
@@ -122,6 +122,7 @@ void DoOTA(void) {
 void CalibrateScale(String strval) {  //C:float known weight
                                       //assumes tared prior to known weight attached
                                       //we want to get to .01 lbs, multiply weight by 100; then multiply scale factor by 100
+                                      //TODO--if strVal len = 0, default to 3.3V
   int calweight = roundf(100.0 * strval.toFloat());
   scale.calibrate_scale(calweight, NumTare);
   scaleCalVal = scale.get_scale() * 100.0;  //adjust for 100X
@@ -343,7 +344,7 @@ void print_wakeup_reason() {
 
 
 
-void BatSnsCk(void) {
+String BatSnsCk(void) {
 
   int battpcnt;
   int battvoltx100 = 0;  //batt volts *100, rounded to int
@@ -386,7 +387,7 @@ void BatSnsCk(void) {
   if (battvoltx100 < 365) {
     GoToSleep(" Battery critically low = " + String(battvoltx100/100) + " ,volts; going to sleep");
   }
-  StringBLETX("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
+  return String("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
 }
 
 
