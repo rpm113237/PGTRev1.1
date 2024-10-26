@@ -22,11 +22,12 @@ void RxStringParse(void) {
     else if (tagStr == "P") SetPwd(valStr);
     else if (tagStr == "O") DoOTA();
     else if (tagStr == "C") CalibrateScale(valStr);
-    else if (tagStr == "TR") DoTare();            //not sure why we need this
-    else if (tagStr == "FRQ") SetFFRate(valStr);  //Start sending FF data at rate int valstr
-    else if (tagStr == "BP") StringBLETX(BatSnsCk());          // query only.
+    else if (tagStr == "TR") DoTare();                 //not sure why we need this
+    else if (tagStr == "FRQ") SetFFRate(valStr);       //Start sending FF data at rate int valstr
+    else if (tagStr == "BP") StringBLETX(BatSnsCk());  // query only.
     else if (tagStr == "ET") SetEpochTime(valStr);
     else if (tagStr == "R") StringBLETX("R:" + REV_LEVEL);  // this is a report--
+    else if (tagStr == "V") CalibrateADC(valStr);
     else Serial.println("Unknown Tag =" + tagStr);
     rxValue.clear();  //erases
   }
@@ -53,8 +54,10 @@ unsigned long getEpochTime(void) {
 void SetEpochTime(String valStr) {
   //set EpochTime to valStr; if ValStr = null, set it to zero
   if (valStr.length() > 0) {
-    EpochTime = atoi(valStr.c_str());
-  } else EpochTime = 0;
+    Force.EpochStart = atoi(valStr.c_str()) + millis();
+
+  } else Force.EpochStart = millis();
+  Force.EpochTime - millis() - Force.EpochStart;
 }
 
 
@@ -67,8 +70,8 @@ float getFloatADC(int numtimes) {
   return adcavg / numtimes;
 }
 
-void CalibrateADC(String strval) {                              //TODO pass string, do float converstion in procedure
-  float BatCalValue = 3.75;                                     //3.75 is default--TODO--move to defines
+void CalibrateADC(String strval) {
+  float BatCalValue = 3.30;                                     //3.30 is default--use regulator output
   if (strval.length() > 0) BatCalValue = atof(strval.c_str());  //stops at first non numeric
                                                                 // Serial.printf("Use Batt Value of %f volts for calibaration",BatCalValue);
   int numrdgs = 10;                                             //probably needs to be in squeezer.h TODO
@@ -184,7 +187,7 @@ void BLEReconnect(void) {
   // connecting
   if (deviceConnected && !oldDeviceConnected) {
     Serial.println("Connected; setting old device; This should happen once");
-    timesInit();    //reset the world to the connect time.
+    timesInit();  //reset the world to the connect time.
     Serial.println("Revision level = " + REV_LEVEL);
     setLED(0, clrs.BLUE);  //for ledBlink
     // do stuff here on connecting
@@ -224,17 +227,15 @@ void MeanSend(void) {
   elmillis = millis() - Force.MeanLastReport;  //incremented every call--which is once per ms
   if (elmillis >= Force.MeanReportTime) {
     Force.MeanLastReport = millis();
-    Serial.printf("Meansend, Elapsed ms = %lu\t", elmillis);  //diagnostic
+    Serial.printf("Mnsend: MN =%.2f\tElapsed ms = %lu\t", Force.MeanVal, elmillis);  //diagnostic
     Serial.printf("Epoch Time = %lu\t", getEpochTime());
-    StringBLETX("M:" + String(Force.MeanVal));                  //note that this can be stale by up to 1ms.
-
-  }  //sends out mean if mean interval has elapsed
+    StringBLETX("M:" + String(Force.MeanVal));  //note that this can be stale by up to 1ms.
+  }                                             //sends out mean if mean interval has elapsed
 }
 
 
 void FFSend(void) {  //TODO--this has to be in Carter's Format
   // rate = FFReport time--default 100ms??
-
   unsigned long elmillis = millis() - Force.FFLastReport;
   if (!Force.FFReport) return;  //ReportFF is set/reset by FRQ:XXXX
   if (elmillis >= Force.FFReportTime) {
@@ -257,21 +258,21 @@ void HFSend(void) {
   elmillis = (millis() - Force.HFLastReport);
   if (elmillis >= Force.HFReportTime) {
     Force.HFLastReport = millis();
-    Serial.printf("HFsend, Elapsed ms = %lu\t", elmillis);  //diagnostic
+    Serial.printf("HFsend; HF= %.2f\tElapsed ms = %lu\t", Force.HFVal, elmillis);  //diagnostic
     Serial.printf("Epoch Time = %lu\t", getEpochTime());
     StringBLETX("HF:" + String(Force.HFVal));
   }
 }
 
-void clrTxString(void) {
-  int i;
-  int Txsize;
-  Txsize = sizeof(TxString) / sizeof(TxString[0]);
-  for (i = 0; i < Txsize; i++) TxString[i] = 0x00;  //needs cleared for some reason.
-}
+// void clrTxString(void) {
+//   int i;
+//   int Txsize;
+//   Txsize = sizeof(TxString) / sizeof(TxString[0]);
+//   for (i = 0; i < Txsize; i++) TxString[i] = 0x00;  //needs cleared for some reason.
+// }
 
 void setLED(int btime, int clrarray[3]) {  //incorporate into LEDBlink
-  BlinkTime = btime;                         //passed in commmon
+  BlinkTime = btime;                       //passed in commmon
   for (int i = 0; i < 3; i++) { clrs.WKCLRS[i] = clrarray[i]; }
 }
 
@@ -357,10 +358,10 @@ String BatSnsCk(void) {
 
   battrdg = getFloatADC(NumADCRdgs);
   battvolts = battrdg * BatSnsFactor;
-  Serial.printf("floatADCRaw = %f\tbatt mult = %f\t batt volts = %f \t numrdgs = %d\n", battrdg, BatSnsFactor, battvolts, NumADCRdgs);
 
   //reference: https://blog.ampow.com/lipo-voltage-chart/
   battvoltx100 = roundf(battvolts * 100);
+  battpcnt = 0;  //default
   if (battvoltx100 >= 420) battpcnt = 100;
   else if (battvoltx100 > 415) battpcnt = 95;
   else if (battvoltx100 > 411) battpcnt = 90;
@@ -381,12 +382,14 @@ String BatSnsCk(void) {
   else if (battvoltx100 > 371) battpcnt = 15;
   else if (battvoltx100 > 369) battpcnt = 10;
   else if (battvoltx100 > 361) battpcnt = 05;
+  if (battpcnt < BattShutDown) GoToSleep(" Battery critically low = " + String(battvoltx100 / 100) + " ,volts; going to sleep");
 
-  if (battvoltx100 < 377) setLED(0, clrs.YELLOW);
-  if (battvoltx100 < 371) setLED(0, clrs.RED);
-  if (battvoltx100 < 365) {
-    GoToSleep(" Battery critically low = " + String(battvoltx100/100) + " ,volts; going to sleep");
-  }
+  Serial.printf("ADCRaw = %.1f\tbatt mult = %f\t batt volts = %.3f \t numrdgs = %d\t", battrdg, BatSnsFactor, battvolts, NumADCRdgs);
+  Serial.println("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
+
+  setLED(BlinkTime, clrs.BLUE);
+  if (battpcnt < BattWarnPcnt) setLED(BlinkTime, clrs.YELLOW);
+  if (battpcnt < BattCritPcnt) setLED(BlinkTime, clrs.RED);
   return String("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
 }
 
@@ -493,7 +496,7 @@ void RunTimeCheck() {
   //increments sleep timer by seconds
   static bool firsttime = true;
   int runtimeseconds = (millis() / 1000 - SleepTimerStart);
-  Serial.printf("\t\tidle time = %d seconds\n", runtimeseconds);
+  Serial.printf("idle time = %d seconds\n", runtimeseconds);
   if ((runtimeseconds > (SleepTimeMax - 30)) && (firsttime == true)) {
     Serial.println("Idlewarning");
     MorseChar('s');

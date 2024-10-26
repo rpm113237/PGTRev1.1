@@ -104,6 +104,9 @@ float Batt_LO_Lvl = 3.3;
 float BatMultDefault = 0.001019;  //TODO -find the nominal value
 float BatSnsFactor = 0.0;
 const int Batt_CK_Interval = 100 * MS_TO_SEC;
+const int BattWarnPcnt = 40;    //turn connect LED Yellow/Orange
+const int BattCritPcnt = 15;    //turn connect LED Red
+const int BattShutDown = 10;    //go to Sleep.
 #define Battmah 1000
 #define Runmah 70
 #define BattFullTime (Battmah / Runmah) * 60  //in minutes
