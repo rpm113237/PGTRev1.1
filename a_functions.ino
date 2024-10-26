@@ -22,31 +22,32 @@ void RxStringParse(void) {
     else if (tagStr == "P") SetPwd(valStr);
     else if (tagStr == "O") DoOTA();
     else if (tagStr == "C") CalibrateScale(valStr);
-    else if (tagStr == "TR") DoTare();  //not sure why we need this
-    else if (tagStr == "FRQ")SetFFRate(valStr);  //Start sending FF data at rate int valstr
-    else if (tagStr == "BP") BatSnsCk();    // query only.
+    else if (tagStr == "TR") DoTare();            //not sure why we need this
+    else if (tagStr == "FRQ") SetFFRate(valStr);  //Start sending FF data at rate int valstr
+    else if (tagStr == "BP") BatSnsCk();          // query only.
     else if (tagStr == "ET") SetEpochTime(valStr);
-    else if (tagStr == "R") StringBLETX("R:" + REV_LEVEL );   
+    else if (tagStr == "R") StringBLETX("R:" + REV_LEVEL);  // this is a report--
     else Serial.println("Unknown Tag =" + tagStr);
     rxValue.clear();  //erases
   }
 }
 
-void SetFFRate(String valStr) {  
-  
-   if (valStr.length() > 0) {
+void SetFFRate(String valStr) {
+
+  if (valStr.length() > 0) {
     Force.FFRate = atoi(valStr.c_str());
-    Force.FFReportTime = 1000/Force.FFRate;   //this could be made settable.
-    Force.FFReport = true; 
+    Force.FFReportTime = 1000 / Force.FFRate;  //this could be made settable.
+    Force.FFReport = true;
     Force.EpochStart = millis();
-    Force.EpochTime = millis()-Force.EpochStart;
+    Force.EpochTime = millis() - Force.EpochStart;
     //if samp rate = 80; rate = 2--> scaleSamples = 40
-  } else{Force.FFReport = false;  //if sample rate = 10, rate = 2, scaleSamples = 5
+  } else {
+    Force.FFReport = false;  //if sample rate = 10, rate = 2, scaleSamples = 5
   }
 }
 
-unsigned long getEpochTime(void){
-  return (millis()- Force.EpochStart); 
+unsigned long getEpochTime(void) {
+  return (millis() - Force.EpochStart);
 }
 
 void SetEpochTime(String valStr) {
@@ -182,9 +183,8 @@ void BLEReconnect(void) {
   // connecting
   if (deviceConnected && !oldDeviceConnected) {
     Serial.println("Connected; setting old device; This should happen once");
-    strcpy(TxString, ("R:" + REV_LEVEL).c_str());  //send out rev level
-    //TODO this should be BLETX
-    Serial.println(TxString);
+    timesInit();    //reset the world to the connect time.
+    Serial.println("Revision level = " + REV_LEVEL);
     setLED(0, clrs.BLUE);  //for ledBlink
     // do stuff here on connecting
     oldDeviceConnected = deviceConnected;
@@ -201,51 +201,46 @@ float cumAvg(float oldAvg, float newForce, int NumSamps) {
   return newavg;
 }
 
-// int floatcomp(const void* elem1, const void* elem2) {
-//   if (*(const float*)elem1 < *(const float*)elem2)
-//     return -1;
-//   return *(const float*)elem1 > *(const float*)elem2;
-// }
+
 
 void CheckForce(void) {  //PGT1 changed
 
   if (scale.is_ready()) {           //.get_units is blocking.
     scaleVal = scale.get_units(1);  //get samples as fast as available
-    
+
     Force.BaseVal = scaleVal;
     Force.FFVal = cumAvg(Force.FFVal, scaleVal, Force.BaseRate / Force.FFRate);
     Force.HFVal = cumAvg(Force.HFVal, scaleVal, Force.BaseRate / Force.HFRate);
     Force.MeanVal = cumAvg(Force.MeanVal, scaleVal, Force.BaseRate * Force.MeanTime);
     if (Force.HFVal > MinForce) SleepTimerStart = millis() / 1000;  //reset sleep timer.Reset this on HF; base rate may be pretty noisy
-    
   }
 }
 
 void MeanSend(void) {
   //called every millisecond, actually sends every MeanTime*1000
   unsigned long elmillis;
-  if(!Force.MeanReport)return;
-  elmillis= millis()-Force.MeanLastReport;  //incremented every call--which is once per ms
+  if (!Force.MeanReport) return;
+  elmillis = millis() - Force.MeanLastReport;  //incremented every call--which is once per ms
   if (elmillis >= Force.MeanReportTime) {
-    Force.MeanLastReport = millis(); 
-    Serial.printf("\tMeansend, Elapsed ms = %lu\t", elmillis);   //diagnostic   
-    StringBLETX("M:" + String(Force.MeanVal));  //note that this can be stale by up to 1ms.
-    
+    Force.MeanLastReport = millis();
+    Serial.printf("Meansend, Elapsed ms = %lu\t", elmillis);  //diagnostic
+    Serial.printf("Epoch Time = %lu\t", getEpochTime());
+    StringBLETX("M:" + String(Force.MeanVal));                  //note that this can be stale by up to 1ms.
+
   }  //sends out mean if mean interval has elapsed
 }
 
 
 void FFSend(void) {  //TODO--this has to be in Carter's Format
   // rate = FFReport time--default 100ms??
-  
-  unsigned long elmillis= millis()-Force.FFLastReport;  
-  if (!Force.FFReport) return;   //ReportFF is set/reset by FRQ:XXXX   
+
+  unsigned long elmillis = millis() - Force.FFLastReport;
+  if (!Force.FFReport) return;  //ReportFF is set/reset by FRQ:XXXX
   if (elmillis >= Force.FFReportTime) {
-    Force.FFLastReport =millis();
-    Serial.printf("\tFFsend: FF = %.2f\tElapsed ms = %lu\t", Force.FFVal, elmillis);   //diagnostic
+    Force.FFLastReport = millis();
+    Serial.printf("FFsend: FF = %.2f\tElapsed ms = %lu\t", Force.FFVal, elmillis);  //diagnostic
     Serial.printf("Epoch Time = %lu\t", getEpochTime());
-    StringBLETX("FF:" + String(getEpochTime())+ String(Force.FFVal));
-    
+    StringBLETX("FF:" + String(getEpochTime()) + String(Force.FFVal));
   }
 }
 
@@ -255,14 +250,15 @@ void FFSend(void) {  //TODO--this has to be in Carter's Format
 void HFSend(void) {
   // rate = HFReport time--default 200ms
   unsigned long elmillis = 0;
-  if(!Force.HFReport) return;
+  if (!Force.HFReport) return;
   //Serial.printf("HFsend, ms = %d\n", milliscount);
   //milliscount++;  //incremented every call--which is once per ms
-  elmillis = (millis()-Force.HFLastReport);
-  if ( elmillis>= Force.HFReportTime) {
+  elmillis = (millis() - Force.HFLastReport);
+  if (elmillis >= Force.HFReportTime) {
     Force.HFLastReport = millis();
-    Serial.printf("HFsend, Elapsed ms = %lu\n", elmillis);   //diagnostic
-    StringBLETX("HF:" + String(Force.HFVal));    
+    Serial.printf("HFsend, Elapsed ms = %lu\t", elmillis);  //diagnostic
+    Serial.printf("Epoch Time = %lu\t", getEpochTime());
+    StringBLETX("HF:" + String(Force.HFVal));
   }
 }
 
@@ -274,20 +270,13 @@ void clrTxString(void) {
 }
 
 void setLED(int btime, int clrarray[3]) {  //incorporate into LEDBlink
-  int i = 0;
-  BlinkTime = btime;
-  for (i = 0; i < 3; i++) {
-    //Serial.printf("i = %d; clr = %d\t", i, clrarray[i] );
-    clrs.WKCLRS[i] = clrarray[i];
-  }
-  Serial.printf("\n");
-  //LEDSelect = LedNo;
+  BlinkTime = btime;                         //passed in commmon
+  for (int i = 0; i < 3; i++) { clrs.WKCLRS[i] = clrarray[i]; }
 }
 
-void LEDBlink() {
+void LEDBlink(void) {
   static u_long lclmillis = 0;
   static bool ON_OFF = true;
-
   if (BlinkTime > 0) {
     if (((millis() - lclmillis) > BlinkTime) && ON_OFF) {
       pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));
@@ -316,8 +305,7 @@ void StringBLETX(String msg) {
     Serial.println("BLE:\t" + msg);
     //delay(1000);
     // bluetooth stack will go into congestion, if too many packets are sent  }
-      }
-      else Serial.println("OFFline:\t" + msg);  //maybe need a debug switch
+  } else Serial.println("OFFline:\t" + msg);  //maybe need a debug switch
 }
 
 
@@ -393,15 +381,12 @@ void BatSnsCk(void) {
   else if (battvoltx100 > 369) battpcnt = 10;
   else if (battvoltx100 > 361) battpcnt = 05;
 
-  if (battvoltx100 < 371) UseRedLED = true;
-  if (battvoltx100 < 3.5) {
-    //Serial.println(" Battery critically low (<3.5), going to sleep");
-    GoToSleep(" Battery critically low (<3.5), going to sleep");
+  if (battvoltx100 < 377) setLED(0, clrs.YELLOW);
+  if (battvoltx100 < 371) setLED(0, clrs.RED);
+  if (battvoltx100 < 365) {
+    GoToSleep(" Battery critically low = " + String(battvoltx100/100) + " ,volts; going to sleep");
   }
-  StringBLETX("BP:"+String(battpcnt)+String((battpcnt * BattFullTime) / 100));
-  // sprintf(TxString, "BP:%d,%d", battpcnt, (battpcnt * BattFullTime) / 100);
-  // BLETX();
-  //
+  StringBLETX("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
 }
 
 
@@ -521,13 +506,11 @@ void RunTimeCheck() {
   }
 }
 
-void timesInit(void){
+void timesInit(void) {
   SleepTimer = 0;
   SleepTimerStart = millis() / 1000;  //reset the sleeptimers
   Force.EpochStart = millis();
   Force.FFLastReport = millis();
   Force.HFLastReport = millis();
   Force.MeanLastReport = millis();
-
-  
 }

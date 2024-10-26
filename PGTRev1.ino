@@ -212,30 +212,31 @@ void setup() {
 
   //Big Question:  What is the purpose of running the scale if no BLE connection?  Why not go directly to loop??
 
-  Serial.print("Connecting (BLE)\n");
+  Serial.print(" Advertising for BLE connection).......");
   BlinkTime = CNCT_LED_BLINK_TIME;
-  setLED(250, clrs.BLUE);
+  setLED(250, clrs.BLUE);     //blinking for connect
+  Serial.println("Revision level = " + REV_LEVEL);
   BatSnsCk();  //sets color for connect led
-  while (!deviceConnected && (el_time < CONN_WAIT_TM)) {
-    if ((el_time % 1000) <= 10) {
-      Serial.print(".");
-      //pServer->startAdvertising();  // restart advertising
-    }
+  // while (!deviceConnected && (el_time < CONN_WAIT_TM)) {
+  //   if ((el_time % 1000) <= 10) {
+  //     Serial.print(".");
+  //     //pServer->startAdvertising();  // restart advertising
+  //   }
 
-    LEDBlink();  //has to be called, since timer isn't being called?? or call timer?
-    delay(10);
-    el_time = millis() - oldmillis;
-  }
+  //   LEDBlink();  //has to be called, since timer isn't being called?? or call timer?
+  //   delay(10);
+  //   el_time = millis() - oldmillis;
+  // }
 
-  if (!deviceConnected) {
-    Serial.printf("****end of setup; not connected****\n");
+  // if (!deviceConnected) {
+  //   Serial.printf("****end of setup; not connected****\n");
 
-  } else {
-    Serial.printf("****end of setup; BLE connected****\n");
-    strcpy(TxString, ("R:" + REV_LEVEL).c_str());
-    Serial.println(TxString);
-    setLED(0, clrs.BLUE);  //for ledBlink
-  }
+  // } else {
+  //   Serial.printf("****end of setup; BLE connected****\n");
+  //   strcpy(TxString, ("R:" + REV_LEVEL).c_str());
+  //   Serial.println(TxString);
+  //   setLED(0, clrs.BLUE);  //for ledBlink
+  // }
   timesInit(); //
 }
 
@@ -243,7 +244,7 @@ void setup() {
 
 void loop() {
   CheckForce();  //check force updates force structure
-  BattChecker.update();   // BatSnsCk checks battery, sends voltage
+  BattChecker.update();   // BatSnsCk checks battery, doesn't send voltage--voltage send is query
   LEDtimer.update();      //should call the ledBlink every 10ms.
   FFReport.update();      //sends out FF data current FF Force, current EpochTime= millis()-EpochTimeStart
   HFReport.update();      //send out HoldForce as HF:(String(Force.HFVal))

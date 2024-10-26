@@ -9,6 +9,7 @@
 #define CONN_WAIT_TM 25 * MS_TO_SEC  //time to wait to connect
 #define SHAVE_HAIRCUT 0x1b           //use esc for shave and haircut
 
+//Defaults*********************************************************
 String REV_LEVEL = "dv1.0";  //actually, include last part of commit number
 const int DefaultBaseRate = 10;// samples persecond
 const int DefaultFFRate = 10;// samples persecond
