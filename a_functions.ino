@@ -1,11 +1,13 @@
 void RxStringParse(void) {
 
-  String tagStr, valStr;  //C:12.3; C is tag, 12.3 is val
-  
+  String tagStr = "";
+  String valStr = "";
+  ;  //C:12.3; C is tag, 12.3 is val
+
   if ((rxValue.length() > 0)) {  //nothing to do if len = 0
-    Serial.println("rxValue " + rxValue);
-    int indxsemi = rxValue.indexOf(':');
-    if (indxsemi < 0) indxsemi = 1;  // make it work for single tags w/o semi
+    //Serial.println("rxValue " + rxValue);
+    int indxsemi = rxValue.indexOf(':');            //-1 if no semi
+    if (indxsemi < 0) indxsemi = rxValue.length();  // make it work for single tags w/o semi
     tagStr = rxValue.substring(0, indxsemi);
     tagStr.toUpperCase();
     //Serial.print("tagstring upper = ");
@@ -15,23 +17,50 @@ void RxStringParse(void) {
     } else valStr = "";  //null for checking
 
 
-    if (tagStr == "X") {
-      // Serial.printf("X is found, hooray\n");
-      //Serial.printf(" Tag 'X' received, Going to Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
-      GoToSleep("App X cmd , Going to Deep Sleep");
-    } else if (tagStr == "V") CalibrateADC(valStr);
+    if (tagStr == "X") GoToSleep("App X cmd , Going to Deep Sleep");
     else if (tagStr == "S") SetSSID(valStr);
     else if (tagStr == "P") SetPwd(valStr);
     else if (tagStr == "O") DoOTA();
     else if (tagStr == "C") CalibrateScale(valStr);
-    else if (tagStr == "T") DoTare();  //not sure why we need this
-
-    else {
-      Serial.println("Unknown Tag =" + tagStr);
-    }
+    else if (tagStr == "TR") DoTare();                 //not sure why we need this
+    else if (tagStr == "FRQ") SetFFRate(valStr);       //Start sending FF data at rate int valstr
+    else if (tagStr == "BP") StringBLETX(BatSnsCk());  // query only.
+    else if (tagStr == "ET") SetEpochTime(valStr);
+    else if (tagStr == "R") StringBLETX("R:" + REV_LEVEL);  // this is a report--
+    else if (tagStr == "V") CalibrateADC(valStr);
+    else Serial.println("Unknown Tag =" + tagStr);
     rxValue.clear();  //erases
   }
 }
+
+void SetFFRate(String valStr) {
+
+  if (valStr.length() > 0) {
+    Force.FFRate = atoi(valStr.c_str());
+    Force.FFReportTime = 1000 / Force.FFRate;  //this could be made settable.
+    Force.FFReport = true;
+    Force.EpochStart = millis();
+    Force.EpochTime = millis() - Force.EpochStart;
+    //if samp rate = 80; rate = 2--> scaleSamples = 40
+  } else {
+    Force.FFReport = false;  //if sample rate = 10, rate = 2, scaleSamples = 5
+  }
+}
+
+unsigned long getEpochTime(void) {
+  return (millis() - Force.EpochStart);
+}
+
+void SetEpochTime(String valStr) {
+  //set EpochTime to valStr; if ValStr = null, set it to zero
+  if (valStr.length() > 0) {
+    Force.EpochStart = atoi(valStr.c_str()) + millis();
+
+  } else Force.EpochStart = millis();
+  Force.EpochTime - millis() - Force.EpochStart;
+}
+
+
 float getFloatADC(int numtimes) {
   float adcavg = 0.0;
   int i;  //old FORTRAN pgmr
@@ -41,8 +70,8 @@ float getFloatADC(int numtimes) {
   return adcavg / numtimes;
 }
 
-void CalibrateADC(String strval) {                              //TODO pass string, do float converstion in procedure
-  float BatCalValue = 3.75;                                     //3.75 is default--TODO--move to defines
+void CalibrateADC(String strval) {
+  float BatCalValue = 3.30;                                     //3.30 is default--use regulator output
   if (strval.length() > 0) BatCalValue = atof(strval.c_str());  //stops at first non numeric
                                                                 // Serial.printf("Use Batt Value of %f volts for calibaration",BatCalValue);
   int numrdgs = 10;                                             //probably needs to be in squeezer.h TODO
@@ -96,6 +125,7 @@ void DoOTA(void) {
 void CalibrateScale(String strval) {  //C:float known weight
                                       //assumes tared prior to known weight attached
                                       //we want to get to .01 lbs, multiply weight by 100; then multiply scale factor by 100
+                                      //TODO--if strVal len = 0, default to 3.3V
   int calweight = roundf(100.0 * strval.toFloat());
   scale.calibrate_scale(calweight, NumTare);
   scaleCalVal = scale.get_scale() * 100.0;  //adjust for 100X
@@ -157,87 +187,98 @@ void BLEReconnect(void) {
   // connecting
   if (deviceConnected && !oldDeviceConnected) {
     Serial.println("Connected; setting old device; This should happen once");
-    strcpy(TxString, ("R:" + REV_LEVEL).c_str());   //send out rev level
-    //TODO this should be BLETX
-    Serial.println(TxString);
+    timesInit();  //reset the world to the connect time.
+    Serial.println("Revision level = " + REV_LEVEL);
     setLED(0, clrs.BLUE);  //for ledBlink
     // do stuff here on connecting
     oldDeviceConnected = deviceConnected;
   }
 }
 
-int floatcomp(const void* elem1, const void* elem2) {
-  if (*(const float*)elem1 < *(const float*)elem2)
-    return -1;
-  return *(const float*)elem1 > *(const float*)elem2;
+float cumAvg(float oldAvg, float newForce, int NumSamps) {
+  /*calculates cum avg ca(n+1)= ca(n)+ (hf(n+1)-ca(n))/(n+1)
+  where n is the number of samples==samprate * seconds for mean
+  https://en.wikipedia.org/wiki/Moving_average#Cumulative_moving_average
+  */
+  float newavg = oldAvg + (newForce - oldAvg) / (NumSamps + 1);
+  //Serial.printf("\toldavg = %.2f\tnewForce = %.2f\tSamps =%d\tNewAvg = %.2f\n", oldAvg,newForce, NumSamps, newavg);
+  return newavg;
 }
+
+
 
 void CheckForce(void) {  //PGT1 changed
-  int i = 0;             //force array index
-  int arraysz = sizeof(Force.ForceArray) / sizeof(Force.ForceArray[0]);
-  if (scale.is_ready()) {  //.get_units is blocking.
-    scaleVal = scale.get_units(scaleSamples);
-    if (scaleVal > MinForce) SleepTimerStart = millis() / 1000;  //reset sleep timer.
-    for (i = (arraysz - 1); i > 0; i--) {
-      Force.ForceArray[i] = Force.ForceArray[i - 1];  //move everything up one spot
-    }
-    Force.ForceArray[0] = scaleVal;
-    //now find max, min, mean
-    Force.ForceMax = scaleVal;
-    Force.ForceMin = scaleVal;
-    Force.ForceMean = 0;
-    for (i = 0; i < arraysz; i++) {
-      if (Force.ForceArray[i] > Force.ForceMax) Force.ForceMax = Force.ForceArray[i];
-      if (Force.ForceArray[i] < Force.ForceMin) Force.ForceMin = Force.ForceArray[i];
-      Force.ForceMean += Force.ForceArray[i];
-    }
 
-    Force.ForceMean = Force.ForceMean / arraysz;
-    float wkarray[FORCE_ARRAY_LEN];  //temp array for sorting
+  if (scale.is_ready()) {           //.get_units is blocking.
+    scaleVal = scale.get_units(1);  //get samples as fast as available
 
-    for (i = 0; i < arraysz; i++) wkarray[i] = Force.ForceArray[i];
-    qsort(wkarray, arraysz, sizeof(float), floatcomp);
-    //   Serial.printf("  sorted\t");
-    //  for(i = 0; i < 10; i++)
-    //     Serial.printf("%.3f\t", wkarray[i]);
-    //  Serial.printf("\n");
-    if (arraysz % 2 == 0) Force.ForceMedian = (wkarray[arraysz / 2] + wkarray[arraysz / 2 + 1]) / 2;
-    else Force.ForceMedian = wkarray[arraysz / 2 + 1];
-
-    clrTxString();
-    sprintf(TxString, "HF:%.1f", scaleVal);
-    BLETX();  //transmits TxString
+    Force.BaseVal = scaleVal;
+    Force.FFVal = cumAvg(Force.FFVal, scaleVal, Force.BaseRate / Force.FFRate);
+    Force.HFVal = cumAvg(Force.HFVal, scaleVal, Force.BaseRate / Force.HFRate);
+    Force.MeanVal = cumAvg(Force.MeanVal, scaleVal, Force.BaseRate * Force.MeanTime);
+    if (Force.HFVal > MinForce) SleepTimerStart = millis() / 1000;  //reset sleep timer.Reset this on HF; base rate may be pretty noisy
   }
 }
 
-void clrTxString(void) {
-  int i;
-  int Txsize;
-  Txsize = sizeof(TxString) / sizeof(TxString[0]);
-  for (i = 0; i < Txsize; i++) TxString[i] = 0x00;  //needs cleared for some reason.
+void MeanSend(void) {
+  //called every millisecond, actually sends every MeanTime*1000
+  unsigned long elmillis;
+  if (!Force.MeanReport) return;
+  elmillis = millis() - Force.MeanLastReport;  //incremented every call--which is once per ms
+  if (elmillis >= Force.MeanReportTime) {
+    Force.MeanLastReport = millis();
+    Serial.printf("Mnsend: MN =%.2f\tElapsed ms = %lu\t", Force.MeanVal, elmillis);  //diagnostic
+    Serial.printf("Epoch Time = %lu\t", getEpochTime());
+    StringBLETX("M:" + String(Force.MeanVal));  //note that this can be stale by up to 1ms.
+  }                                             //sends out mean if mean interval has elapsed
 }
 
-void VibSend() {
-  clrTxString();
-  sprintf(TxString, "M:%.1f,%.1f,%.1f", Force.ForceMax, Force.ForceMin, Force.ForceMean);
-  BLETX();
+
+void FFSend(void) {  //TODO--this has to be in Carter's Format
+  // rate = FFReport time--default 100ms??
+  unsigned long elmillis = millis() - Force.FFLastReport;
+  if (!Force.FFReport) return;  //ReportFF is set/reset by FRQ:XXXX
+  if (elmillis >= Force.FFReportTime) {
+    Force.FFLastReport = millis();
+    Serial.printf("FFsend: FF = %.2f\tElapsed ms = %lu\t", Force.FFVal, elmillis);  //diagnostic
+    Serial.printf("Epoch Time = %lu\t", getEpochTime());
+    StringBLETX("FF:" + String(getEpochTime()) + String(Force.FFVal));
+  }
 }
+
+
+
+
+void HFSend(void) {
+  // rate = HFReport time--default 200ms
+  unsigned long elmillis = 0;
+  if (!Force.HFReport) return;
+  //Serial.printf("HFsend, ms = %d\n", milliscount);
+  //milliscount++;  //incremented every call--which is once per ms
+  elmillis = (millis() - Force.HFLastReport);
+  if (elmillis >= Force.HFReportTime) {
+    Force.HFLastReport = millis();
+    Serial.printf("HFsend; HF= %.2f\tElapsed ms = %lu\t", Force.HFVal, elmillis);  //diagnostic
+    Serial.printf("Epoch Time = %lu\t", getEpochTime());
+    StringBLETX("HF:" + String(Force.HFVal));
+  }
+}
+
+// void clrTxString(void) {
+//   int i;
+//   int Txsize;
+//   Txsize = sizeof(TxString) / sizeof(TxString[0]);
+//   for (i = 0; i < Txsize; i++) TxString[i] = 0x00;  //needs cleared for some reason.
+// }
 
 void setLED(int btime, int clrarray[3]) {  //incorporate into LEDBlink
-  int i = 0;
-  BlinkTime = btime;
-  for (i = 0; i < 3; i++) {
-    //Serial.printf("i = %d; clr = %d\t", i, clrarray[i] );
-    clrs.WKCLRS[i] = clrarray[i];
-  }
-  Serial.printf("\n");
-  //LEDSelect = LedNo;
+  BlinkTime = btime;                       //passed in commmon
+  for (int i = 0; i < 3; i++) { clrs.WKCLRS[i] = clrarray[i]; }
 }
 
-void LEDBlink() {
+void LEDBlink(void) {
   static u_long lclmillis = 0;
   static bool ON_OFF = true;
-
   if (BlinkTime > 0) {
     if (((millis() - lclmillis) > BlinkTime) && ON_OFF) {
       pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));
@@ -258,17 +299,17 @@ void LEDBlink() {
 }
 
 
-
-void BLETX(void) {
-
-  if (strlen(TxString) > 19) Serial.println("String >19, truncated");
+void StringBLETX(String msg) {
+  if (msg.length() > 19) Serial.println("String too long, truncated, length = " + String(msg.length()));
   if (deviceConnected) {
-    pTxCharacteristic->setValue(TxString);
+    pTxCharacteristic->setValue(msg);
     pTxCharacteristic->notify();
-    Serial.printf("BLE\t%20s\n", TxString);
-    // bluetooth stack will go into congestion, if too many packets are sent
-  } else Serial.printf("OFFline\t%20s\n", TxString);
+    Serial.println("BLE:\t" + msg);
+    //delay(1000);
+    // bluetooth stack will go into congestion, if too many packets are sent  }
+  } else Serial.println("OFFline:\t" + msg);  //maybe need a debug switch
 }
+
 
 
 void print_wakeup_reason() {
@@ -304,7 +345,7 @@ void print_wakeup_reason() {
 
 
 
-void BatSnsCk(void) {
+String BatSnsCk(void) {
 
   int battpcnt;
   int battvoltx100 = 0;  //batt volts *100, rounded to int
@@ -317,10 +358,10 @@ void BatSnsCk(void) {
 
   battrdg = getFloatADC(NumADCRdgs);
   battvolts = battrdg * BatSnsFactor;
-  Serial.printf("floatADCRaw = %f\tbatt mult = %f\t batt volts = %f \t numrdgs = %d\n", battrdg, BatSnsFactor, battvolts, NumADCRdgs);
 
   //reference: https://blog.ampow.com/lipo-voltage-chart/
   battvoltx100 = roundf(battvolts * 100);
+  battpcnt = 0;  //default
   if (battvoltx100 >= 420) battpcnt = 100;
   else if (battvoltx100 > 415) battpcnt = 95;
   else if (battvoltx100 > 411) battpcnt = 90;
@@ -341,16 +382,18 @@ void BatSnsCk(void) {
   else if (battvoltx100 > 371) battpcnt = 15;
   else if (battvoltx100 > 369) battpcnt = 10;
   else if (battvoltx100 > 361) battpcnt = 05;
+  if (battpcnt < BattShutDown) GoToSleep(" Battery critically low = " + String(battvoltx100 / 100) + " ,volts; going to sleep");
 
-  if (battvoltx100 < 371) UseRedLED = true;
-  if (battvoltx100 < 3.5) {
-    //Serial.println(" Battery critically low (<3.5), going to sleep");
-    GoToSleep(" Battery critically low (<3.5), going to sleep");
-  }
-  sprintf(TxString, "BP:%d,%d", battpcnt, (battpcnt * BattFullTime) / 100);
-  BLETX();
-  //
+  Serial.printf("ADCRaw = %.1f\tbatt mult = %f\t batt volts = %.3f \t numrdgs = %d\t", battrdg, BatSnsFactor, battvolts, NumADCRdgs);
+  Serial.println("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
+
+  setLED(BlinkTime, clrs.BLUE);
+  if (battpcnt < BattWarnPcnt) setLED(BlinkTime, clrs.YELLOW);
+  if (battpcnt < BattCritPcnt) setLED(BlinkTime, clrs.RED);
+  return String("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
 }
+
+
 
 void GoToSleep(String DSmsg) {
   scale.power_down();
@@ -453,7 +496,7 @@ void RunTimeCheck() {
   //increments sleep timer by seconds
   static bool firsttime = true;
   int runtimeseconds = (millis() / 1000 - SleepTimerStart);
-  Serial.printf("\t\tidle time = %d seconds\n", runtimeseconds);
+  Serial.printf("idle time = %d seconds\n", runtimeseconds);
   if ((runtimeseconds > (SleepTimeMax - 30)) && (firsttime == true)) {
     Serial.println("Idlewarning");
     MorseChar('s');
@@ -465,4 +508,13 @@ void RunTimeCheck() {
     //Serial.printf("No activity for %lu seconds, go to sleep\n", SleepTimeMax);
     GoToSleep("No activity for " + (String)SleepTimeMax + "seconds, go to sleep");
   }
+}
+
+void timesInit(void) {
+  SleepTimer = 0;
+  SleepTimerStart = millis() / 1000;  //reset the sleeptimers
+  Force.EpochStart = millis();
+  Force.FFLastReport = millis();
+  Force.HFLastReport = millis();
+  Force.MeanLastReport = millis();
 }
