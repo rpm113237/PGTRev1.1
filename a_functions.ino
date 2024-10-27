@@ -57,7 +57,7 @@ void SetEpochTime(String valStr) {
     Force.EpochStart = atoi(valStr.c_str()) + millis();
 
   } else Force.EpochStart = millis();
-  Force.EpochTime - millis() - Force.EpochStart;
+  //Force.EpochTime - millis() - Force.EpochStart;
 }
 
 
@@ -233,7 +233,6 @@ void MeanSend(void) {
   }                                             //sends out mean if mean interval has elapsed
 }
 
-
 void FFSend(void) {  //TODO--this has to be in Carter's Format
   // rate = FFReport time--default 100ms??
   unsigned long elmillis = millis() - Force.FFLastReport;
@@ -245,9 +244,6 @@ void FFSend(void) {  //TODO--this has to be in Carter's Format
     StringBLETX("FF:" + String(getEpochTime()) + String(Force.FFVal));
   }
 }
-
-
-
 
 void HFSend(void) {
   // rate = HFReport time--default 200ms
@@ -263,13 +259,6 @@ void HFSend(void) {
     StringBLETX("HF:" + String(Force.HFVal));
   }
 }
-
-// void clrTxString(void) {
-//   int i;
-//   int Txsize;
-//   Txsize = sizeof(TxString) / sizeof(TxString[0]);
-//   for (i = 0; i < Txsize; i++) TxString[i] = 0x00;  //needs cleared for some reason.
-// }
 
 void setLED(int btime, int clrarray[3]) {  //incorporate into LEDBlink
   BlinkTime = btime;                       //passed in commmon
@@ -382,7 +371,7 @@ String BatSnsCk(void) {
   else if (battvoltx100 > 371) battpcnt = 15;
   else if (battvoltx100 > 369) battpcnt = 10;
   else if (battvoltx100 > 361) battpcnt = 05;
-  if (battpcnt < BattShutDown) GoToSleep(" Battery critically low = " + String(battvoltx100 / 100) + " ,volts; going to sleep");
+  if (battpcnt < BattShutDown) GoToSleep(" Battery critically low = " + String((float)battvoltx100 / 100) + "volts; going to sleep");
 
   Serial.printf("ADCRaw = %.1f\tbatt mult = %f\t batt volts = %.3f \t numrdgs = %d\t", battrdg, BatSnsFactor, battvolts, NumADCRdgs);
   Serial.println("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
@@ -393,10 +382,8 @@ String BatSnsCk(void) {
   return String("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
 }
 
-
-
 void GoToSleep(String DSmsg) {
-  scale.power_down();
+  scale.power_down();   //should be anyway
   Serial.println(DSmsg);                                                                 // tell why shutting down.
   pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));  //turn LED's OFF
   pixels.show();                                                                         // Send the updated pixel colors to the hardware.
