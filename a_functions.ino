@@ -198,8 +198,8 @@ void BLEReconnect(void) {
 float cumAvg(float oldAvg, float newForce, int NumSamps) {
   /*calculates cum avg ca(n+1)= ca(n)+ (hf(n+1)-ca(n))/(n+1)
   where n is the number of samples==samprate * seconds for mean
+  https://en.wikipedia.org/wiki/Moving_average#Cumulative_moving_average
   */
-  // ForceMean = ForceMean + (force-ForceMean)/(scaleSamples);
   float newavg = oldAvg + (newForce - oldAvg) / (NumSamps + 1);
   //Serial.printf("\toldavg = %.2f\tnewForce = %.2f\tSamps =%d\tNewAvg = %.2f\n", oldAvg,newForce, NumSamps, newavg);
   return newavg;
