@@ -69,7 +69,7 @@ struct ForceStruct{
 
 const int VIB_SND_INTERVAL = 1000;  //ms
 
-int ditTime = 100, chSpTime = 300;  //dit and dah
+int ditTime = 75, chSpTime = 225;  //dit and dah
 u_long cwFreq = 2500;
 
 int freq = 500;
@@ -148,9 +148,9 @@ void RunTimeCheck(void);
 void ResetSwitch(void);
 void GoToSleep(String DSmsg);
 void SendRev(String valStr);
-void MeanSend (void);
-void HFSend (void);
-void FFSend (void);
+void MeanSend (unsigned long ET);
+void HFSend (unsigned long ET);
+void FFSend (unsigned long ET);
 void print_wakeup_reason();
 void Soundwakeup(void);
 void timesInit(void);

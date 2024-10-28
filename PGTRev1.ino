@@ -39,9 +39,9 @@ static const BaseType_t app_cpu = 1;
 
 TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);  //calls LEDBlink, called every 10MS, repeats forever, resolution MS
 
-TickTwo MeanReport(MeanSend, 1, 0, MILLIS);  //send vibration data every VIB_SND_INTERVAL (ms), forever
-TickTwo HFReport(HFSend, 1, 0, MILLIS);
-TickTwo FFReport(FFSend, 1, 0, MILLIS);
+// TickTwo MeanReport(MeanSend, 1, 0, MILLIS);  //send vibration data every VIB_SND_INTERVAL (ms), forever
+// TickTwo HFReport(HFSend, 1, 0, MILLIS);
+// TickTwo FFReport(FFSend, 1, 0, MILLIS);
 
 
 TickTwo BattChecker(BatSnsCk, Batt_CK_Interval, 0, MILLIS);  //checks battery every Batt_Ck_Interval
@@ -139,9 +139,9 @@ void setup() {
   //start the TickTwo timers
   LEDtimer.start();     //start LED timer
   BattChecker.start();  //start Batt checker
-  MeanReport.start();   //start Mean  report
-  FFReport.start();
-  HFReport.start();
+  // MeanReport.start();   //start Mean  report
+  // FFReport.start();
+  // HFReport.start();
   SleepChecker.start();  //start sleepchecker
 
   // Create the BLE Device
@@ -223,14 +223,28 @@ void setup() {
 
 //**************loop()***************************************
 void loop() {
-  CheckForce();  //check force updates force structure
-  BattChecker.update();   // BatSnsCk checks battery, doesn't send voltage--voltage send is query
-  LEDtimer.update();      //should call the ledBlink every 10ms.
-  FFReport.update();      //sends out FF data current FF Force, current EpochTime= millis()-EpochTimeStart
-  HFReport.update();      //send out HoldForce as HF:(String(Force.HFVal))
-  MeanReport.update();    // MeanReport
-  SleepChecker.update();  //check for timeout
+  BLEReconnect();         //
   ResetSwitch();          //check for OFF
   RxStringParse();        //check for orders from the boss (App)
-  BLEReconnect();         //TODO does this work???
+  
+  CheckForce();  //check force updates force structure 
+  unsigned long lclET = getEpochTime();   //Epoch time stamp (ms)--could be done in CheckForce??
+
+  FFSend(lclET);  // put send once in FFSend
+  HFSend(lclET);
+  MeanSend(lclET);
+
+  //if (lclET % Batt_CK_Interval <=2 )BatSnsCk();
+  //if (lclET % Force.Batt_CK_Interval <=2 )BatSnsCk();
+
+ // FFReport.update();      //sends out FF data current FF Force, current EpochTime= millis()-EpochTimeStart
+ // HFReport.update();      //send out HoldForce as HF:(String(Force.HFVal))
+  //MeanReport.update();    // MeanReport
+  //following are non time critical, leave on TickTwo since
+  BattChecker.update();   // BatSnsCk checks battery, doesn't send voltage--voltage send is query
+  LEDtimer.update();      //should call the ledBlink every 10ms.
+  SleepChecker.update();  //check for timeout
+  
+  
+  
 }  //end of loop

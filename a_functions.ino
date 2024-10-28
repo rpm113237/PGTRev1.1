@@ -81,6 +81,7 @@ void CalibrateADC(String strval) {
   prefs.putFloat("BatADCScale", BatSnsFactor);
   //TODO put the 3.75 default  and numrdg in defines
 }
+
 void SetSSID(String ValStr) {
   //S:Valstr; if Valstr ="", then revert to default--is this a good idea??
   if (ValStr.length() > 0) strcpy(SSstr, ValStr.c_str());
@@ -213,51 +214,46 @@ void CheckForce(void) {  //PGT1 changed
     scaleVal = scale.get_units(1);  //get samples as fast as available
 
     Force.BaseVal = scaleVal;
-    Force.FFVal = cumAvg(Force.FFVal, scaleVal, Force.BaseRate / Force.FFRate);
+    Force.FFVal = cumAvg(Force.FFVal, scaleVal, Force.BaseRate / Force.FFRate);  // baserate/ffrate = num samples for avg.
     Force.HFVal = cumAvg(Force.HFVal, scaleVal, Force.BaseRate / Force.HFRate);
     Force.MeanVal = cumAvg(Force.MeanVal, scaleVal, Force.BaseRate * Force.MeanTime);
     if (Force.HFVal > MinForce) SleepTimerStart = millis() / 1000;  //reset sleep timer.Reset this on HF; base rate may be pretty noisy
   }
 }
 
-void MeanSend(void) {
-  //called every millisecond, actually sends every MeanTime*1000
-  unsigned long elmillis;
+void MeanSend(unsigned long ET) {
+  static bool sentalready = false;
   if (!Force.MeanReport) return;
-  elmillis = millis() - Force.MeanLastReport;  //incremented every call--which is once per ms
-  if (elmillis >= Force.MeanReportTime) {
-    Force.MeanLastReport = millis();
-    Serial.printf("Mnsend: MN =%.2f\tElapsed ms = %lu\t", Force.MeanVal, elmillis);  //diagnostic
-    Serial.printf("Epoch Time = %lu\t", getEpochTime());
-    StringBLETX("M:" + String(Force.MeanVal));  //note that this can be stale by up to 1ms.
-  }                                             //sends out mean if mean interval has elapsed
+  if ((ET % Force.MeanReportTime <= 1) && !sentalready) {  //Mean Time
+      Serial.printf("MNsend: MN = %.2f\tEpoch Time (ms) = %lu\t\t", Force.MeanVal, ET);  //diagnostic
+      StringBLETX("MN:"+ String(Force.MeanVal));
+      sentalready = true;
+    }
+  if ((ET % Force.MeanReportTime > 1)) sentalready = false;
+  //sends out mean if mean interval has elapsed
 }
 
-void FFSend(void) {  //TODO--this has to be in Carter's Format
-  // rate = FFReport time--default 100ms??
-  unsigned long elmillis = millis() - Force.FFLastReport;
-  if (!Force.FFReport) return;  //ReportFF is set/reset by FRQ:XXXX
-  if (elmillis >= Force.FFReportTime) {
-    Force.FFLastReport = millis();
-    Serial.printf("FFsend: FF = %.2f\tElapsed ms = %lu\t", Force.FFVal, elmillis);  //diagnostic
-    Serial.printf("Epoch Time = %lu\t", getEpochTime());
-    StringBLETX("FF:" + String(getEpochTime()) + String(Force.FFVal));
-  }
+void FFSend(unsigned long ET) {  //TODO--this has to be in Carter's Format
+  static bool sentalready = false;
+  if (!Force.FFReport) return;
+  if ((ET % Force.FFReportTime <= 1) && !sentalready) {
+      Serial.printf("FFsend: FF = %.2f\tEpoch Time (ms) = %lu\t\t", Force.FFVal, ET);  //diagnostic
+      StringBLETX("FF:" + String(getEpochTime())+ "," + String(Force.FFVal));
+      sentalready = true;
+    }
+  if ((ET % Force.FFReportTime > 1)) sentalready = false;
 }
 
-void HFSend(void) {
+void HFSend(unsigned long ET) {
   // rate = HFReport time--default 200ms
-  unsigned long elmillis = 0;
+  static bool sentalready = false;
   if (!Force.HFReport) return;
-  //Serial.printf("HFsend, ms = %d\n", milliscount);
-  //milliscount++;  //incremented every call--which is once per ms
-  elmillis = (millis() - Force.HFLastReport);
-  if (elmillis >= Force.HFReportTime) {
-    Force.HFLastReport = millis();
-    Serial.printf("HFsend; HF= %.2f\tElapsed ms = %lu\t", Force.HFVal, elmillis);  //diagnostic
-    Serial.printf("Epoch Time = %lu\t", getEpochTime());
-    StringBLETX("HF:" + String(Force.HFVal));
-  }
+  if ((ET % Force.HFReportTime <= 1) && !sentalready) {
+      Serial.printf("HFsend: HF = %.2f\tEpoch Time (ms) = %lu\t\t", Force.HFVal, ET);  //diagnostic
+      StringBLETX("HF:" + String(Force.HFVal));
+      sentalready = true;
+    }
+  if ((ET % Force.HFReportTime > 1)) sentalready = false;
 }
 
 void setLED(int btime, int clrarray[3]) {  //incorporate into LEDBlink
@@ -383,7 +379,7 @@ String BatSnsCk(void) {
 }
 
 void GoToSleep(String DSmsg) {
-  scale.power_down();   //should be anyway
+  scale.power_down();                                                                    //should be anyway
   Serial.println(DSmsg);                                                                 // tell why shutting down.
   pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));  //turn LED's OFF
   pixels.show();                                                                         // Send the updated pixel colors to the hardware.
