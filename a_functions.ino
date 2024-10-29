@@ -163,7 +163,7 @@ void ConnectWiFi(void) {
   }
   Serial.print("Connected to ; IP Address = ");
   Serial.print(ssid);
-  // Serial.print("IP address: ");
+  StringBLETX ("IP:"+ String (WiFi.localIP()));
   Serial.println(WiFi.localIP());
   server.on("/", []() {
     server.send(200, "text/plain", "Hello from PGT Rev1 ElegantOTA!!!");
