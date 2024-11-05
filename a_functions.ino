@@ -15,8 +15,6 @@ void RxStringParse(void) {
     if (rxValue.length() > (indxsemi + 1)) {
       valStr = rxValue.substring((indxsemi + 1), rxValue.length());
     } else valStr = "";  //null for checking
-
-
     if (tagStr == "X") GoToSleep("App X cmd , Going to Deep Sleep");
     else if (tagStr == "S") SetSSID(valStr);
     else if (tagStr == "P") SetPwd(valStr);
@@ -28,19 +26,60 @@ void RxStringParse(void) {
     else if (tagStr == "ET") SetEpochTime(valStr);
     else if (tagStr == "R") StringBLETX("R:" + REV_LEVEL);  // this is a report--
     else if (tagStr == "V") CalibrateADC(valStr);
+    else if (tagStr == "HF") SetHFRate(valStr);          //Set HF reporting Rate
+    else if (tagStr == "MR") SetMeanReportTime(valStr);  //Set Rate at which Mean is reported
+    else if (tagStr == "MT") SetMeanTime(valStr);        // Seet Time over which Mean is calculated.
     else Serial.println("Unknown Tag =" + tagStr);
     rxValue.clear();  //erases
+  }
+}
+void SetMeanTime(String valStr) {  //mean calculation time (seconds)
+  if (valStr.length() > 0) {
+    if (atoi(valStr.c_str()) > 0) {
+      Force.MeanTime = atoi(valStr.c_str());
+      Force.MeanReport = true;
+    }
+    //if samp rate = 80; rate = 5--> scaleSamples = 16
+  } else {
+    Force.MeanReport = false;
+  }
+}
+
+void SetMeanReportTime(String valStr) {  //mean report time milliseconds
+  if (valStr.length() > 0) {
+    if (atoi(valStr.c_str()) > 0) {
+      Force.MeanReportTime = atoi(valStr.c_str());
+      Force.MeanReport = true;
+    }
+    //if samp rate = 80; rate = 5--> scaleSamples = 16
+  } else {
+    Force.MeanReport = false;
+  }
+}
+
+void SetHFRate(String valStr) {
+  if (valStr.length() > 0) {
+    if (atoi(valStr.c_str()) > 0) {
+      Force.HFRate = atoi(valStr.c_str());
+      Force.HFReportTime = 1000 / Force.HFRate;  //this could be made settable.
+      Force.HFReport = true;
+    }
+    //if samp rate = 80; rate = 5--> scaleSamples = 16
+  } else {
+    Force.HFReport = false;
   }
 }
 
 void SetFFRate(String valStr) {
 
   if (valStr.length() > 0) {
-    Force.FFRate = atoi(valStr.c_str());
-    Force.FFReportTime = 1000 / Force.FFRate;  //this could be made settable.
-    Force.FFReport = true;
-    Force.EpochStart = millis();
-    Force.EpochTime = millis() - Force.EpochStart;
+    if (atoi(valStr.c_str()) > 0) {
+      Force.FFRate = atoi(valStr.c_str());
+      Force.FFReportTime = 1000 / Force.FFRate;  //this could be made settable.
+      Force.FFReport = true;
+      Force.EpochStart = millis();
+      Force.EpochTime = millis() - Force.EpochStart;
+    }
     //if samp rate = 80; rate = 2--> scaleSamples = 40
   } else {
     Force.FFReport = false;  //if sample rate = 10, rate = 2, scaleSamples = 5
@@ -163,7 +202,7 @@ void ConnectWiFi(void) {
   }
   Serial.print("Connected to ; IP Address = ");
   Serial.print(ssid);
-  StringBLETX ("IP:"+ String (WiFi.localIP()));
+  StringBLETX("IP:" + String(WiFi.localIP()));
   Serial.println(WiFi.localIP());
   server.on("/", []() {
     server.send(200, "text/plain", "Hello from PGT Rev1 ElegantOTA!!!");
@@ -224,23 +263,28 @@ void CheckForce(void) {  //PGT1 changed
 void MeanSend(unsigned long ET) {
   static bool sentalready = false;
   if (!Force.MeanReport) return;
-  if ((ET % Force.MeanReportTime <= 1) && !sentalready) {  //Mean Time
-      Serial.printf("MNsend: MN = %.2f\tEpoch Time (ms) = %lu\t\t", Force.MeanVal, ET);  //diagnostic
-      StringBLETX("MN:"+ String(Force.MeanVal));
-      sentalready = true;
-    }
+  if ((ET % Force.MeanReportTime <= 1) && !sentalready) {                              //Mean Time
+    Serial.printf("MNsend: MN = %.2f\tEpoch Time (ms) = %lu\t\t", Force.MeanVal, ET);  //diagnostic
+    StringBLETX("MN:" + String(Force.MeanVal));
+    sentalready = true;
+  }
   if ((ET % Force.MeanReportTime > 1)) sentalready = false;
   //sends out mean if mean interval has elapsed
 }
 
 void FFSend(unsigned long ET) {  //TODO--this has to be in Carter's Format
   static bool sentalready = false;
+  unsigned long wkul = 123456;
   if (!Force.FFReport) return;
   if ((ET % Force.FFReportTime <= 1) && !sentalready) {
-      Serial.printf("FFsend: FF = %.2f\tEpoch Time (ms) = %lu\t\t", Force.FFVal, ET);  //diagnostic
-      StringBLETX("FF:" + String(getEpochTime())+ "," + String(Force.FFVal));
-      sentalready = true;
-    }
+    //Serial.printf("FFsend: FF = %.2f\tEpoch Time (ms) = %lu\t\t", Force.FFVal, ET);  //diagnostic
+    //StringBLETX("FF:" + String(getEpochTime()) + "," + String(Force.FFVal));
+    wkul = getEpochTime();
+    memcpy(TxString, &wkul, sizeof(unsigned long));
+    memcpy((TxString + 4), &Force.FFVal, sizeof(float));
+    StringBLETX(String(TxString, HEX));
+    sentalready = true;
+  }
   if ((ET % Force.FFReportTime > 1)) sentalready = false;
 }
 
@@ -249,10 +293,10 @@ void HFSend(unsigned long ET) {
   static bool sentalready = false;
   if (!Force.HFReport) return;
   if ((ET % Force.HFReportTime <= 1) && !sentalready) {
-      Serial.printf("HFsend: HF = %.2f\tEpoch Time (ms) = %lu\t\t", Force.HFVal, ET);  //diagnostic
-      StringBLETX("HF:" + String(Force.HFVal));
-      sentalready = true;
-    }
+    Serial.printf("HFsend: HF = %.2f\tEpoch Time (ms) = %lu\t\t", Force.HFVal, ET);  //diagnostic
+    StringBLETX("HF:" + String(Force.HFVal));
+    sentalready = true;
+  }
   if ((ET % Force.HFReportTime > 1)) sentalready = false;
 }
 
@@ -367,7 +411,7 @@ String BatSnsCk(void) {
   else if (battvoltx100 > 371) battpcnt = 15;
   else if (battvoltx100 > 369) battpcnt = 10;
   else if (battvoltx100 > 361) battpcnt = 05;
-  if (battpcnt < BattShutDown) GoToSleep(" Battery critically low = " + String((float)battvoltx100 / 100) + "volts; going to sleep");
+  if (battpcnt < BattShutDownPcnt) GoToSleep(" Battery critically low = " + String((float)battvoltx100 / 100) + "volts; going to sleep");
 
   Serial.printf("ADCRaw = %.1f\tbatt mult = %f\t batt volts = %.3f \t numrdgs = %d\t", battrdg, BatSnsFactor, battvolts, NumADCRdgs);
   Serial.println("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
@@ -379,11 +423,16 @@ String BatSnsCk(void) {
 }
 
 void GoToSleep(String DSmsg) {
-  scale.power_down();                                                                    //should be anyway
-  Serial.println(DSmsg);                                                                 // tell why shutting down.
-  pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));  //turn LED's OFF
-  pixels.show();                                                                         // Send the updated pixel colors to the hardware.
+  scale.power_down();     //should be anyway
+  Serial.println(DSmsg);  // tell why shutting down.
+  //pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));  //turn LED's OFF
+
+  pixels.clear();
+  pixels.show();  // Send the updated pixel colors to the hardware.
   MorseChar(SHAVE_HAIRCUT);
+  ledcDetach(buzzPin);  //disconnect the PWM
+  pinMode(buzzPin, INPUT_PULLDOWN);
+  //digitalWrite(buzzPin, LOW);  //Make the buzzer low.
   //Serial.printf("******Low Battery Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
   esp_deep_sleep_enable_gpio_wakeup(1 << StartButton, ESP_GPIO_WAKEUP_GPIO_LOW);
   esp_deep_sleep_start();

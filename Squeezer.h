@@ -10,19 +10,16 @@
 #define SHAVE_HAIRCUT 0x1b           //use esc for shave and haircut
 
 //Defaults*********************************************************
-String REV_LEVEL = "dv1.0";  //actually, include last part of commit number
+String REV_LEVEL = "4Nov24v1.2";  //actually, include last part of commit number
 const int DefaultBaseRate = 10;// samples persecond
 const int DefaultFFRate = 10;// samples persecond
 const int DefaultHFRate = 5; //samples per second
+const int DefaultHFReportTime = 200;
 const int DefaultMeanTime = 2;
-String DefaultSSID = "McClellan_Workshop";
-String DefaultPWD = "Rangeland1";
-
-
-
+const String DefaultSSID = "McClellan_Workshop";
+const String DefaultPWD = "Rangeland1";
 
 RTC_DATA_ATTR int bootCount = 0;  //keep track of how many times since power on TODO--put this in flash
-
 
 unsigned long oldmillis;        //to time the states
 unsigned long int el_time = 0;  //elapsed time
@@ -31,7 +28,7 @@ unsigned long EpochTime;    //for FF reporting
 
 float scaleVal = 0.0;           //scale data
 float scaleCalVal = 8545.85;    //replace with typical number.
-float scaleCalDeflt = 8545.85;  //measured on SN10
+const float scaleCalDeflt = 8545.85;  //measured on SN10
 const int NumWarmup = 10;
 const int NumTare = 10;
 char TxString[25];  // used to transmit
@@ -55,8 +52,8 @@ struct ForceStruct{
   unsigned long FFLastReport;	//millis of last report
   float FFVal;    //moving average over last BaseRate/FFRate Samples
   bool HFReport = true;
-  int HFRate = 5;   //This is the samples per second the scale runs at
-  int HFReportTime = 200; // number of milliseconds to report at
+  int HFRate = DefaultHFRate;   //This is the samples per second the scale runs at
+  int HFReportTime =DefaultHFReportTime; // number of milliseconds to report at
   unsigned long HFLastReport;	//millis of last hf report
   //int HFSamples == BaseRate/HFRate
   float HFVal; //moving average over last BaseRate/HF rate samples
@@ -105,8 +102,8 @@ float BatMultDefault = 0.001019;  //TODO -find the nominal value
 float BatSnsFactor = 0.0;
 const int Batt_CK_Interval = 100 * MS_TO_SEC;
 const int BattWarnPcnt = 40;    //turn connect LED Yellow/Orange
-const int BattCritPcnt = 15;    //turn connect LED Red
-const int BattShutDown = 10;    //go to Sleep.
+const int BattCritPcnt = 30;    //turn connect LED Red
+const int BattShutDownPcnt = 20;    //go to Sleep.pcnt
 #define Battmah 1000
 #define Runmah 70
 #define BattFullTime (Battmah / Runmah) * 60  //in minutes

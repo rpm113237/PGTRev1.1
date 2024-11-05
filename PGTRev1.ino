@@ -217,6 +217,7 @@ void setup() {
   setLED(250, clrs.BLUE);     //blinking for connect
   Serial.println("Revision level = " + REV_LEVEL);
   Serial.println(BatSnsCk());  //sets color for connect led
+  BatSnsCk();
   
   timesInit(); //
 }
