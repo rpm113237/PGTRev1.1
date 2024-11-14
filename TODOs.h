@@ -38,6 +38,31 @@ TODO???? Run cal routines off the serial monitor at setup?
 
 Figure out why TxString needs cleared--or at least integrate it into bletx
 
+Rev5Nov24
+
+Squawks:
+1) BOOT (IO9) NOT PULLED LOW.  IDIOT!  (pull it low on programmer output) WTF doesn't PGMR pull it low?
+
+	GPIO	Function	          Comment
+
+  IO0   NA
+  IO1   SWStart_MPU         High if SWStart closed; if =HI, power up was due to switch
+  IO2   NC                  
+  IO3   PD_SCK              HX711 Serial Clock
+	IO4		SCL			            ADS1015; use Tillart's lib or Sparkfun--maybe better
+  IO5   SDA                 ADS1015
+  IO6   ADC_RDY             From ADS1015--Not sure needed
+  IO7   HX_DOUT             HX711 DOUT
+  IO8   SK_DIN              SK6812 DIN
+  IO9   BOOT                --see squawk 1)
+  IO10  RATE                HX711 L = 10 sps, H = 80 sps
+  RXD                       PIN 11; TX output of Programmer
+  TXD                       PIN 12; RX Input of PGMR
+  IO18  ShutDown            HIGH Turns Power OFF (latched)
+  IO19  BuzzPWM             Buzzer PWM
+
+
+
 
 
 
