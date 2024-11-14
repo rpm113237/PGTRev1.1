@@ -201,7 +201,7 @@ void ConnectWiFi(void) {
     Serial.print(".");
   }
   Serial.print("Connected to ; IP Address = ");
-  Serial.print(ssid);
+  Serial.println(ssid);
   StringBLETX("IP:" + String(WiFi.localIP()));
   Serial.println(WiFi.localIP());
   server.on("/", []() {
