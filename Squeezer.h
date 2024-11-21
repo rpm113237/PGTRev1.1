@@ -11,7 +11,7 @@
 
 //Defaults*********************************************************
 String REV_LEVEL = "4Nov24v1.2";  //actually, include last part of commit number
-const int DefaultBaseRate = 10;// samples persecond
+const int DefaultBaseRate = 80;// samples persecond
 const int DefaultFFRate = 10;// samples persecond
 const int DefaultHFRate = 5; //samples per second
 const int DefaultHFReportTime = 200;  //ms
