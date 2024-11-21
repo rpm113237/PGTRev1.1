@@ -11,7 +11,7 @@ TODO--why in the hell does the Soundwakeup sound twice on first call?
 
 Start Switch:  In this implementation, the start switch wakes up from deep sleep.  Optionally, goes into deep sleep on long hold?  Pause, restart, etc. goes away. need only long click for operator shutdown?  Send
 notification to app of operator shutdown??  
-TODO  Since it is entirely app driven, do we even need a power off function on the PGT?
+TODO  Since it is entirely app driven, do we even need a power off function on the PGT?T
 
 TODO Shut down--if no force above background dither of NN minutes, go to sleep.  What if App has disconnected; device
 runs until batter runs down?
@@ -35,13 +35,16 @@ Thge LED blinking code is messy.  LedSelect no longer relevant--only one LED.  C
 !!!! look at aclibrated ADC reads, also cal routine.
 
 TODO???? Run cal routines off the serial monitor at setup?
+TODO 
 
 Figure out why TxString needs cleared--or at least integrate it into bletx
 
 Rev5Nov24
 
 Squawks:
-1) BOOT (IO9) NOT PULLED LOW.  IDIOT!  (pull it low on programmer output) WTF doesn't PGMR pull it low?
+1) BOOT (IO8) NOT PULLED HIGH.  IDIOT!  (Note IO9 is managed by programmer)
+2) Pull RATE LOW--10k.  Probably not needed.
+3)  For 5Nov version.  How do we know if it is a fresh boot
 
 	GPIO	Function	          Comment
 

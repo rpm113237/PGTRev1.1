@@ -135,6 +135,10 @@ void setup() {
   Soundwakeup();          //wake up feedback
   //Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));
   pinMode(StartButton, INPUT);
+  pinMode (RatePin, OUTPUT);
+  if (DefaultBaseRate ==10)digitalWrite(RatePin, LOW);
+  else if (DefaultBaseRate ==80) digitalWrite(RatePin, HIGH);
+  else Serial.println ("Unknown Base Rate ="+String(DefaultBaseRate));
 
   //start the TickTwo timers
   LEDtimer.start();     //start LED timer
@@ -178,10 +182,14 @@ void setup() {
 
   //set up flash
   prefs.begin("BatADCScale");  //multiply adc float by this to get voltage
+ // Serial.println( "ADCalibration at start up =" +String(prefs.getFloat("BatADCScale")));
   prefs.begin("SSID");         //prefs library wants length of string
   prefs.begin("PWD");
   prefs.begin("RunTime");  //run time in minutes? 10K minutes = 166hrs.  Not long enough.
   prefs.begin("ScaleScale");
+  //Serial.println( "Scale Calibration at start up =" + String(prefs.getFloat("ScaleScale")));
+  setFlashDefaults();
+
   //move next to connectWiFi??
   strcpy(SSstr, prefs.getString("SSID", DefaultSSID).c_str());  //SSstr is init in squeezer.h
   strcpy(PWDstr, prefs.getString("PWD", DefaultPWD).c_str());   //PWDstr is init in squeezer.h

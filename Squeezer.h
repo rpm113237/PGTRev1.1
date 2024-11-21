@@ -14,8 +14,8 @@ String REV_LEVEL = "4Nov24v1.2";  //actually, include last part of commit number
 const int DefaultBaseRate = 10;// samples persecond
 const int DefaultFFRate = 10;// samples persecond
 const int DefaultHFRate = 5; //samples per second
-const int DefaultHFReportTime = 200;
-const int DefaultMeanTime = 2;
+const int DefaultHFReportTime = 200;  //ms
+const int DefaultMeanTime = 2;    //
 const String DefaultSSID = "McClellan_Workshop";
 const String DefaultPWD = "Rangeland1";
 
@@ -59,7 +59,7 @@ struct ForceStruct{
   float HFVal; //moving average over last BaseRate/HF rate samples
   bool MeanReport = true;
   int MeanTime = 2; //time(seconds) that Mean is calculated over
-  int MeanReportTime = 1000; // ms to report mean
+  int MeanReportTime = 2000; // ms to report mean
   unsigned long MeanLastReport; 
   float MeanVal; //moving average over last MeanTime * BaseRate samples.
 } Force;
@@ -74,6 +74,7 @@ const int ledChannel = 0;
 const int resolution = 8;
 const int dutycycle = 127;  //50 percent +/-
 const int buzzPin = 19;
+const int RatePin = 10; // = 0 for 10 sps, 1 for 80 sps
 
 const int NEOPIN = 8;                                               //
 const int NEOPIXELS = 2;                                            //two led's
@@ -98,7 +99,7 @@ float battvolts = 0.0;
 float Batt_HI_Lvl = 3.6;
 float Batt_OK_Lvl = 3.5;
 float Batt_LO_Lvl = 3.3;
-float BatMultDefault = 0.001019;  //TODO -find the nominal value
+float BatMultDefault = 0.001448;  //TODO -find the nominal value
 float BatSnsFactor = 0.0;
 const int Batt_CK_Interval = 100 * MS_TO_SEC;
 const int BattWarnPcnt = 40;    //turn connect LED Yellow/Orange
@@ -130,7 +131,7 @@ const char* password = PWDstr;
 //protos
 void setLED(int LedNo, int btime, int clrarray[]);
 void VibSend(void);
-void BLETX(void);
+void StringBLETX(String msg, bool SndSer);
 void LEDBlink(void);
 String BatSnsCk(void);
 void SoundBuzz(u_long cwFreq = 2500, int sound_ms = 100);
@@ -151,6 +152,6 @@ void FFSend (unsigned long ET);
 void print_wakeup_reason();
 void Soundwakeup(void);
 void timesInit(void);
-
+void setFlashDefaults(void);
 
 #endif

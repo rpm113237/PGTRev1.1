@@ -20,11 +20,11 @@ void RxStringParse(void) {
     else if (tagStr == "P") SetPwd(valStr);
     else if (tagStr == "O") DoOTA();
     else if (tagStr == "C") CalibrateScale(valStr);
-    else if (tagStr == "TR") DoTare();                 //not sure why we need this
-    else if (tagStr == "FRQ") SetFFRate(valStr);       //Start sending FF data at rate int valstr
-    else if (tagStr == "BP") StringBLETX(BatSnsCk());  // query only.
+    else if (tagStr == "TR") DoTare();                       //not sure why we need this
+    else if (tagStr == "FRQ") SetFFRate(valStr);             //Start sending FF data at rate int valstr
+    else if (tagStr == "BP") StringBLETX(BatSnsCk(), true);  // query only.
     else if (tagStr == "ET") SetEpochTime(valStr);
-    else if (tagStr == "R") StringBLETX("R:" + REV_LEVEL);  // this is a report--
+    else if (tagStr == "R") StringBLETX(("R:" + REV_LEVEL), true);  // this is a report--
     else if (tagStr == "V") CalibrateADC(valStr);
     else if (tagStr == "HF") SetHFRate(valStr);          //Set HF reporting Rate
     else if (tagStr == "MR") SetMeanReportTime(valStr);  //Set Rate at which Mean is reported
@@ -202,7 +202,7 @@ void ConnectWiFi(void) {
   }
   Serial.print("Connected to ; IP Address = ");
   Serial.println(ssid);
-  StringBLETX("IP:" + String(WiFi.localIP()));
+  StringBLETX("IP:" + String(WiFi.localIP()), true);
   Serial.println(WiFi.localIP());
   server.on("/", []() {
     server.send(200, "text/plain", "Hello from PGT Rev1 ElegantOTA!!!");
@@ -263,9 +263,9 @@ void CheckForce(void) {  //PGT1 changed
 void MeanSend(unsigned long ET) {
   static bool sentalready = false;
   if (!Force.MeanReport) return;
-  if ((ET % Force.MeanReportTime <= 1) && !sentalready) {                              //Mean Time
-    Serial.printf("MNsend: MN = %.2f\tEpoch Time (ms) = %lu\t\t", Force.MeanVal, ET);  //diagnostic
-    StringBLETX("MN:" + String(Force.MeanVal));
+  if ((ET % Force.MeanReportTime <= 1) && !sentalready) {                            //Mean Time
+    Serial.printf("MNsend: MN = %.2f\tEpoch Time (ms) = %lu\n", Force.MeanVal, ET);  //diagnostic
+    StringBLETX("MN:" + String(Force.MeanVal), true);
     sentalready = true;
   }
   if ((ET % Force.MeanReportTime > 1)) sentalready = false;
@@ -277,12 +277,12 @@ void FFSend(unsigned long ET) {  //TODO--this has to be in Carter's Format
   unsigned long wkul = 123456;
   if (!Force.FFReport) return;
   if ((ET % Force.FFReportTime <= 1) && !sentalready) {
-    //Serial.printf("FFsend: FF = %.2f\tEpoch Time (ms) = %lu\t\t", Force.FFVal, ET);  //diagnostic
+    Serial.printf("FFTSnd: ET= %lu\t FF = %.2f\n", ET, Force.FFVal);  //diagnostic
     //StringBLETX("FF:" + String(getEpochTime()) + "," + String(Force.FFVal));
     wkul = getEpochTime();
     memcpy(TxString, &wkul, sizeof(unsigned long));
-    memcpy((TxString + 4), &Force.FFVal, sizeof(float));
-    StringBLETX(String(TxString, HEX));
+    memcpy((TxString + sizeof(unsigned long)), &Force.FFVal, sizeof(float));
+    StringBLETX(String(TxString, HEX), false);  //don't send serial in BLETX
     sentalready = true;
   }
   if ((ET % Force.FFReportTime > 1)) sentalready = false;
@@ -293,8 +293,8 @@ void HFSend(unsigned long ET) {
   static bool sentalready = false;
   if (!Force.HFReport) return;
   if ((ET % Force.HFReportTime <= 1) && !sentalready) {
-    Serial.printf("HFsend: HF = %.2f\tEpoch Time (ms) = %lu\t\t", Force.HFVal, ET);  //diagnostic
-    StringBLETX("HF:" + String(Force.HFVal));
+    Serial.printf("HFsend: HF = %.2f\tEpoch Time (ms) = %lu\n", Force.HFVal, ET);  //diagnostic
+    StringBLETX("HF:" + String(Force.HFVal), true);
     sentalready = true;
   }
   if ((ET % Force.HFReportTime > 1)) sentalready = false;
@@ -328,15 +328,15 @@ void LEDBlink(void) {
 }
 
 
-void StringBLETX(String msg) {
+void StringBLETX(String msg, bool SndSer) {
   if (msg.length() > 19) Serial.println("String too long, truncated, length = " + String(msg.length()));
   if (deviceConnected) {
     pTxCharacteristic->setValue(msg);
     pTxCharacteristic->notify();
-    Serial.println("BLE:\t" + msg);
+    if (SndSer) Serial.println("BLE:\t" + msg);
     //delay(1000);
     // bluetooth stack will go into congestion, if too many packets are sent  }
-  } else Serial.println("OFFline:\t" + msg);  //maybe need a debug switch
+  } else if (SndSer) Serial.println("OFFline:\t" + msg);  //maybe need a debug switch
 }
 
 
@@ -370,6 +370,31 @@ void print_wakeup_reason() {
       Serial.printf("Wakeup was not caused by deep sleep; reason code = %d\n", wakeup_reason);
       break;
   }
+  esp_reset_reason_t reset_reason = esp_reset_reason();  //this should only be for non deep sleep.
+
+  switch (reset_reason) {
+    case ESP_RST_UNKNOWN:
+      Serial.println("Reset reason can not be determined.");
+      break;
+    case ESP_RST_POWERON:
+      Serial.println("Reset due to power-on event.");
+      break;
+    case ESP_RST_SW:
+      Serial.println("Software Reset via esp_restart");
+      break;
+    case ESP_RST_PANIC:
+      Serial.println("Software Exception due to exception/panic");
+      break;
+    // case ESP_RST_:  // 05 - this is used by ESP32-C3 as EXT0/EXT1 does not available in C3
+    //   Serial.printf("***Wakeup number %d by GPIO %d  ***\n", ++bootCount, StartButton);
+    //   break;
+    // case ESP_RST_:
+    //   Serial.println("Wakeup caused by ULP program");
+    //   break;
+    default:
+      Serial.printf("Wakeup was not caused by deep sleep; reason code = %d\n", wakeup_reason);
+      break;
+  }
 }
 
 
@@ -379,11 +404,6 @@ String BatSnsCk(void) {
   int battpcnt;
   int battvoltx100 = 0;  //batt volts *100, rounded to int
   float battrdg = 0;     //raw
-  BatSnsFactor = prefs.getFloat("BatADCScale");
-  if (isnan(BatSnsFactor)) {
-    BatSnsFactor = BatMultDefault;
-    Serial.printf("ADC Mult not initialized, using default = %f\n", BatSnsFactor);
-  }
 
   battrdg = getFloatADC(NumADCRdgs);
   battvolts = battrdg * BatSnsFactor;
@@ -411,11 +431,10 @@ String BatSnsCk(void) {
   else if (battvoltx100 > 371) battpcnt = 15;
   else if (battvoltx100 > 369) battpcnt = 10;
   else if (battvoltx100 > 361) battpcnt = 05;
-  if (battpcnt < BattShutDownPcnt) GoToSleep(" Battery critically low = " + String((float)battvoltx100 / 100) + "volts; going to sleep");
 
   Serial.printf("ADCRaw = %.1f\tbatt mult = %f\t batt volts = %.3f \t numrdgs = %d\t", battrdg, BatSnsFactor, battvolts, NumADCRdgs);
   Serial.println("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
-
+  if (battpcnt < BattShutDownPcnt) GoToSleep(" Battery critically low = " + String((float)battvoltx100 / 100) + "volts; going to sleep");
   setLED(BlinkTime, clrs.BLUE);
   if (battpcnt < BattWarnPcnt) setLED(BlinkTime, clrs.YELLOW);
   if (battpcnt < BattCritPcnt) setLED(BlinkTime, clrs.RED);
@@ -549,4 +568,22 @@ void timesInit(void) {
   Force.FFLastReport = millis();
   Force.HFLastReport = millis();
   Force.MeanLastReport = millis();
+}
+
+void setFlashDefaults(void) {  //sets ADC, Scale defaults
+  BatSnsFactor = prefs.getFloat("BatADCScale");
+  if (isnan(BatSnsFactor) || (BatSnsFactor <= 0)) {
+    BatSnsFactor = BatMultDefault;
+    prefs.putFloat("BatADCScale", BatSnsFactor);
+    Serial.println("ADC Mult not initialized, using default = %f"+ String( BatSnsFactor));
+  } else Serial.println("ADC flash calibration =" + String(BatSnsFactor,6));
+
+  scaleCalVal = prefs.getFloat("ScaleScale");
+  if (isnan(scaleCalVal) || (scaleCalVal <= 0)) {  //scale cal should always be positive
+    scaleCalVal = scaleCalDeflt;
+    prefs.putFloat("ScaleScale", scaleCalDeflt);
+    Serial.println("Scale Cal not initialized, using default = " + String(scaleCalVal,2));
+  } else Serial.println("Scale flash calibration = " + String(scaleCalVal));
+  scale.set_scale(scaleCalVal);
+ 
 }
