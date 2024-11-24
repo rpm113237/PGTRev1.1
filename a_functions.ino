@@ -26,9 +26,9 @@ void RxStringParse(void) {
     else if (tagStr == "ET") SetEpochTime(valStr);
     else if (tagStr == "R") StringBLETX(("R:" + REV_LEVEL), true);  // this is a report--
     else if (tagStr == "V") CalibrateADC(valStr);
-    else if (tagStr == "HF") SetHFRate(valStr);          //Set HF reporting Rate
-    else if (tagStr == "MR") SetMeanReportTime(valStr);  //Set Rate at which Mean is reported
-    else if (tagStr == "MT") SetMeanTime(valStr);        // Seet Time over which Mean is calculated.
+    else if (tagStr == "HF") SetHFRate(valStr);  //Set HF reporting Rate
+    // else if (tagStr == "MR") SetMeanReportTime(valStr);  //Set Rate at which Mean is reported
+    else if (tagStr == "MT") SetMeanTime(valStr);  // Seet Time over which Mean is calculated.
     else Serial.println("Unknown Tag =" + tagStr);
     rxValue.clear();  //erases
   }
@@ -37,6 +37,8 @@ void SetMeanTime(String valStr) {  //mean calculation time (seconds)
   if (valStr.length() > 0) {
     if (atoi(valStr.c_str()) > 0) {
       Force.MeanTime = atoi(valStr.c_str());
+      Force.MeanReportTime = MS_TO_SEC * Force.MeanTime;  //note minimum of one second
+      Force.MNNSamp = BaseSampleRate * Force.MeanTime;
       Force.MeanReport = true;
     }
     //if samp rate = 80; rate = 5--> scaleSamples = 16
@@ -45,23 +47,23 @@ void SetMeanTime(String valStr) {  //mean calculation time (seconds)
   }
 }
 
-void SetMeanReportTime(String valStr) {  //mean report time milliseconds
-  if (valStr.length() > 0) {
-    if (atoi(valStr.c_str()) > 0) {
-      Force.MeanReportTime = atoi(valStr.c_str());
-      Force.MeanReport = true;
-    }
-    //if samp rate = 80; rate = 5--> scaleSamples = 16
-  } else {
-    Force.MeanReport = false;
-  }
-}
+// void SetMeanReportTime(String valStr) {  //mean report time milliseconds
+//   if (valStr.length() > 0) {
+//     if (atoi(valStr.c_str()) > 0) {
+//       Force.MeanReportTime = atoi(valStr.c_str());
+//       Force.MeanReport = true;
+//     }
+//     //if samp rate = 80; rate = 5--> scaleSamples = 16
+//   } else {
+//     Force.MeanReport = false;
+//   }
+//}
 
 void SetHFRate(String valStr) {
   if (valStr.length() > 0) {
     if (atoi(valStr.c_str()) > 0) {
       Force.HFRate = atoi(valStr.c_str());
-      Force.HFReportTime = 1000 / Force.HFRate;  //this could be made settable.
+      Force.HFReportTime = 1000 / Force.HFRate;  //this could be made indpendablely settable.
       Force.HFReport = true;
     }
     //if samp rate = 80; rate = 5--> scaleSamples = 16
@@ -75,7 +77,7 @@ void SetFFRate(String valStr) {
   if (valStr.length() > 0) {
     if (atoi(valStr.c_str()) > 0) {
       Force.FFRate = atoi(valStr.c_str());
-      Force.FFReportTime = 1000 / Force.FFRate;  //this could be made settable.
+      Force.FFReportTime = MS_TO_SEC / Force.FFRate;  //this could be made settable.
       Force.FFReport = true;
       Force.EpochStart = millis();
       Force.EpochTime = millis() - Force.EpochStart;
@@ -252,7 +254,7 @@ void CheckForce(void) {  //PGT1 changed
   if (scale.is_ready()) {           //.get_units is blocking.
     scaleVal = scale.get_units(1);  //get samples as fast as available
 
-    Force.BaseVal = scaleVal;
+    //Force.BaseVal = scaleVal;
     Force.FFVal = cumAvg(Force.FFVal, scaleVal, Force.BaseRate / Force.FFRate);  // baserate/ffrate = num samples for avg.
     Force.HFVal = cumAvg(Force.HFVal, scaleVal, Force.BaseRate / Force.HFRate);
     Force.MeanVal = cumAvg(Force.MeanVal, scaleVal, Force.BaseRate * Force.MeanTime);
@@ -562,6 +564,24 @@ void RunTimeCheck() {
 }
 
 void timesInit(void) {
+  //init Force struct
+  if (Force.FFRate > 0) {
+    Force.FFReportTime = MS_TO_SEC / Force.FFRate;
+    Force.FFNSamp = BaseSampleRate / Force.FFRate;
+  } else Serial.println("FFrate screwed; <=0 = " + String(Force.FFRate));
+
+  if (Force.HFRate > 0) {
+    Force.HFReportTime = MS_TO_SEC / Force.HFRate;
+    Force.HFNSamp = BaseSampleRate / Force.HFRate;
+  } else Serial.println("HFrate screwed; <=0 = " + String(Force.HFRate));
+
+  if (Force.MeanTime > 0) {
+    Force.MeanReportTime = MS_TO_SEC * Force.MeanTime;  //note minimum of one second
+    Force.MNNSamp = BaseSampleRate * Force.MeanTime;
+  } else Serial.println("Mean Time screwed; <=0 = " + String(Force.FFRate));
+
+  //Force struct initialized
+
   SleepTimer = 0;
   SleepTimerStart = millis() / 1000;  //reset the sleeptimers
   Force.EpochStart = millis();
@@ -575,15 +595,14 @@ void setFlashDefaults(void) {  //sets ADC, Scale defaults
   if (isnan(BatSnsFactor) || (BatSnsFactor <= 0)) {
     BatSnsFactor = BatMultDefault;
     prefs.putFloat("BatADCScale", BatSnsFactor);
-    Serial.println("ADC Mult not initialized, using default = %f"+ String( BatSnsFactor));
-  } else Serial.println("ADC flash calibration =" + String(BatSnsFactor,6));
+    Serial.println("ADC Mult not initialized, using default = %f" + String(BatSnsFactor));
+  } else Serial.println("ADC flash calibration =" + String(BatSnsFactor, 6));
 
   scaleCalVal = prefs.getFloat("ScaleScale");
   if (isnan(scaleCalVal) || (scaleCalVal <= 0)) {  //scale cal should always be positive
     scaleCalVal = scaleCalDeflt;
     prefs.putFloat("ScaleScale", scaleCalDeflt);
-    Serial.println("Scale Cal not initialized, using default = " + String(scaleCalVal,2));
+    Serial.println("Scale Cal not initialized, using default = " + String(scaleCalVal, 2));
   } else Serial.println("Scale flash calibration = " + String(scaleCalVal));
   scale.set_scale(scaleCalVal);
- 
 }

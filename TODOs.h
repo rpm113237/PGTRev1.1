@@ -13,8 +13,6 @@ Start Switch:  In this implementation, the start switch wakes up from deep sleep
 notification to app of operator shutdown??  
 TODO  Since it is entirely app driven, do we even need a power off function on the PGT?T
 
-TODO Shut down--if no force above background dither of NN minutes, go to sleep.  What if App has disconnected; device
-runs until batter runs down?
 
 Scale:  Currently hard wired to 10 sps; 
 
@@ -37,7 +35,17 @@ Thge LED blinking code is messy.  LedSelect no longer relevant--only one LED.  C
 TODO???? Run cal routines off the serial monitor at setup?
 TODO 
 
-Figure out why TxString needs cleared--or at least integrate it into bletx
+*******************  Sampling Rate vs Reporting Rate  *************************
+IN 21Sp24 and subsequent branch revisons, the scale is sampled at 80 sps.  (Is there any need to do 10?) 
+The actual reported number (HF, FF, Mean) is calculated over some time--or number of samples.  The scale is asychronous and not necessarily 
+time accurate.  That is, the 80 sps is unlikely to be exactly 12.5ms.
+Reporting, OTOH, is synchronous to the ESP32 clock. "Epoch Time"; initialized on power up or from the App.
+As it stands, the Forces are done via a stochastic approximation-- "cumulative average"--which is actually an exponentially weighted past
+approach.
+ https://en.wikipedia.org/wiki/Moving_average#Cumulative_moving_average
+ In the current implementation, the cum average is calculated over the nominal corresponding time period of the report.  That is, if HF
+
+
 
 Rev5Nov24
 

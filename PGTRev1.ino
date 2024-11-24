@@ -136,16 +136,14 @@ void setup() {
   //Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));
   pinMode(StartButton, INPUT);
   pinMode (RatePin, OUTPUT);
-  if (DefaultBaseRate ==10)digitalWrite(RatePin, LOW);
-  else if (DefaultBaseRate ==80) digitalWrite(RatePin, HIGH);
-  else Serial.println ("Unknown Base Rate ="+String(DefaultBaseRate));
+
+  if (BaseSampleRate ==10)digitalWrite(RatePin, LOW);
+  else if (BaseSampleRate ==80) digitalWrite(RatePin, HIGH);
+  else Serial.println ("Unknown Base Rate ="+String(BaseSampleRate));
 
   //start the TickTwo timers
   LEDtimer.start();     //start LED timer
   BattChecker.start();  //start Batt checker
-  // MeanReport.start();   //start Mean  report
-  // FFReport.start();
-  // HFReport.start();
   SleepChecker.start();  //start sleepchecker
 
   // Create the BLE Device
@@ -225,7 +223,7 @@ void setup() {
   setLED(250, clrs.BLUE);     //blinking for connect
   Serial.println("Revision level = " + REV_LEVEL);
   Serial.println(BatSnsCk());  //sets color for connect led
-  BatSnsCk();
+  //BatSnsCk();   //do once on start up--doesn't report.
   
   timesInit(); //
 }
@@ -242,14 +240,7 @@ void loop() {
   FFSend(lclET);  // put send once in FFSend
   HFSend(lclET);
   MeanSend(lclET);
-
-  //if (lclET % Batt_CK_Interval <=2 )BatSnsCk();
-  //if (lclET % Force.Batt_CK_Interval <=2 )BatSnsCk();
-
- // FFReport.update();      //sends out FF data current FF Force, current EpochTime= millis()-EpochTimeStart
- // HFReport.update();      //send out HoldForce as HF:(String(Force.HFVal))
-  //MeanReport.update();    // MeanReport
-  //following are non time critical, leave on TickTwo since
+  
   BattChecker.update();   // BatSnsCk checks battery, doesn't send voltage--voltage send is query
   LEDtimer.update();      //should call the ledBlink every 10ms.
   SleepChecker.update();  //check for timeout

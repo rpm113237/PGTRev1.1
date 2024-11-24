@@ -2,20 +2,22 @@
 #ifndef _SQUEEZER_H
 #define _SQUEEZER_H
 #include <Adafruit_NeoPixel.h>
+String REV_LEVEL = "4Nov24v1.2";  //actually, include last part of commit number
 
-//#define DEBUGSQUEEZER  //comment this out for real run times
-#define CNCT_LED_BLINK_TIME 1000  //BLINK TIME FOR CONNECT LED
+
+#define CNCT_LED_BLINK_TIME 1000     //BLINK TIME FOR CONNECT LED
 #define MS_TO_SEC 1000               //convert to secs
 #define CONN_WAIT_TM 25 * MS_TO_SEC  //time to wait to connect
 #define SHAVE_HAIRCUT 0x1b           //use esc for shave and haircut
 
 //Defaults*********************************************************
-String REV_LEVEL = "4Nov24v1.2";  //actually, include last part of commit number
-const int DefaultBaseRate = 80;// samples persecond
-const int DefaultFFRate = 10;// samples persecond
-const int DefaultHFRate = 5; //samples per second
-const int DefaultHFReportTime = 200;  //ms
-const int DefaultMeanTime = 2;    //
+
+//Note--number of samples are caclulated in timesinit(); i.e HFrate = 5 => 80/6 = 16 samples
+const int BaseSampleRate = 80;  //scale 80 sps
+const int DfltFFRate = 20;      // samples persecond
+const int DfltHFRate = 5;       //samples per second
+//const int DefaultHFReportTime = 200;  //ms
+const int DfltMeanTime = 2;  // Note--period as opposed to Time
 const String DefaultSSID = "McClellan_Workshop";
 const String DefaultPWD = "Rangeland1";
 
@@ -23,11 +25,10 @@ RTC_DATA_ATTR int bootCount = 0;  //keep track of how many times since power on 
 
 unsigned long oldmillis;        //to time the states
 unsigned long int el_time = 0;  //elapsed time
-unsigned long EpochTime;    //for FF reporting
-//unsigned long EpochTimeStart;
+//unsigned long EpochTime;    //for FF reporting
 
-float scaleVal = 0.0;           //scale data
-float scaleCalVal = 8545.85;    //replace with typical number.
+float scaleVal = 0.0;                 //scale data
+float scaleCalVal = 8545.85;          //replace with typical number.
 const float scaleCalDeflt = 8545.85;  //measured on SN10
 const int NumWarmup = 10;
 const int NumTare = 10;
@@ -38,30 +39,36 @@ const int HX711_dout = 7;  //mcu > HX711 dout pin
 const int HX711_sck = 3;   //mcu > HX711 sck pin
 
 
-struct ForceStruct{  
+struct ForceStruct {
   /* Force is accumulated and averages calculated based on scale. Reporting is synchronous tied to TickTwo
-  for now; ony rate for FF, HF is settable; the report time will be set as 1000/rate milliseconds.
-  */ 
-  unsigned long EpochStart;	//Start of PGT EpochStart
-  unsigned long EpochTime; //in ms == millis()-EpochStartTime
-  int BaseRate = DefaultBaseRate;    //for Rev1--10 BASERATE #define 80
-  float BaseVal;  //updated every sample
-  bool FFReport = true;
-  int FFRate = DefaultFFRate;  //samples/sec
-  int FFReportTime = 100; //report at this rate (ms)
-  unsigned long FFLastReport;	//millis of last report
-  float FFVal;    //moving average over last BaseRate/FFRate Samples
+  for now; ony rate for FF, HF is settable; the report time will be set as (1000/rate) milliseconds.
+  */
+  unsigned long EpochStart;       //Start of PGT EpochStart
+  unsigned long EpochTime;        //in ms == millis()-EpochStartTime
+  int BaseRate = BaseSampleRate;  //for Rev1--10 BASERATE #define 80--this is obsolete, I think
+  //float BaseVal;  //updated every sample
+
+  bool FFReport = true;     // if true, report FF
+  int FFRate = DfltFFRate;  //reports/sec
+  int FFReportTime;         //report at this rate (ms)init in timesinit
+  int FFNSamp;
+  unsigned long FFLastReport;  //millis of last report
+  float FFVal;                 //moving average over last BaseRate/FFRate Samples
+
   bool HFReport = true;
-  int HFRate = DefaultHFRate;   //This is the samples per second the scale runs at
-  int HFReportTime =DefaultHFReportTime; // number of milliseconds to report at
-  unsigned long HFLastReport;	//millis of last hf report
-  //int HFSamples == BaseRate/HFRate
-  float HFVal; //moving average over last BaseRate/HF rate samples
+  int HFRate = DfltHFRate;  //This is the samples per second the scale runs at
+  int HFReportTime;         // number of milliseconds to report at init in inittimes()
+  int HFNSamp;
+  unsigned long HFLastReport;  //millis of last hf report
+  float HFVal;                 //moving average over last BaseRate/HF rate samples
+
+
   bool MeanReport = true;
-  int MeanTime = 2; //time(seconds) that Mean is calculated over
-  int MeanReportTime = 2000; // ms to report mean
-  unsigned long MeanLastReport; 
-  float MeanVal; //moving average over last MeanTime * BaseRate samples.
+  int MeanTime = DfltMeanTime;  //time(seconds) that Mean is calculated over
+  int MeanReportTime;           // ms to report mean;  calc in inittimes
+  int MNNSamp;
+  unsigned long MeanLastReport;
+  float MeanVal;  //moving average over last MeanTime * BaseRate samples.
 } Force;
 
 const int VIB_SND_INTERVAL = 1000;  //ms
@@ -74,7 +81,7 @@ const int ledChannel = 0;
 const int resolution = 8;
 const int dutycycle = 127;  //50 percent +/-
 const int buzzPin = 19;
-const int RatePin = 10; // = 0 for 10 sps, 1 for 80 sps
+const int RatePin = 10;  // = 0 for 10 sps, 1 for 80 sps
 
 const int NEOPIN = 8;                                               //
 const int NEOPIXELS = 2;                                            //two led's
@@ -102,16 +109,16 @@ float Batt_LO_Lvl = 3.3;
 float BatMultDefault = 0.001448;  //TODO -find the nominal value
 float BatSnsFactor = 0.0;
 const int Batt_CK_Interval = 100 * MS_TO_SEC;
-const int BattWarnPcnt = 40;    //turn connect LED Yellow/Orange
-const int BattCritPcnt = 30;    //turn connect LED Red
-const int BattShutDownPcnt = 20;    //go to Sleep.pcnt
+const int BattWarnPcnt = 40;      //turn connect LED Yellow/Orange
+const int BattCritPcnt = 30;      //turn connect LED Red
+const int BattShutDownPcnt = 20;  //go to Sleep.pcnt
 #define Battmah 1000
 #define Runmah 70
 #define BattFullTime (Battmah / Runmah) * 60  //in minutes
 
 
 const int StartButton = 1;  //
-const int FastPin = 18;  //set =1 for 80 samplses/sec
+const int FastPin = 18;     //set =1 for 80 samplses/sec
 
 uint16_t SleepTimer;          // in seconds reset if HF> MinForce
 uint32_t SleepTimeMax = 300;  //sleep timeout in sec
@@ -129,13 +136,21 @@ const char* password = PWDstr;
 
 
 //protos
-void setLED(int LedNo, int btime, int clrarray[]);
+void setLED(int btime, int clrarray[]);
 void VibSend(void);
 void StringBLETX(String msg, bool SndSer);
 void LEDBlink(void);
 String BatSnsCk(void);
+void BLEReconnect(void);
+void CheckForce(void);
+
 void SoundBuzz(u_long cwFreq = 2500, int sound_ms = 100);
 void CalibrateADC(String strval);
+void SetFFRate(String valStr);
+void SetHFRate(String valStr);
+void SetEpochTime(String valStr);
+void ConnectWiFi(void);
+void MorseChar(int cwChar);
 void SetSSID(String ValStr);
 void SetPwd(String ValStr);
 void DoOTA(void);
@@ -146,12 +161,13 @@ void RunTimeCheck(void);
 void ResetSwitch(void);
 void GoToSleep(String DSmsg);
 void SendRev(String valStr);
-void MeanSend (unsigned long ET);
-void HFSend (unsigned long ET);
-void FFSend (unsigned long ET);
+void MeanSend(unsigned long ET);
+void HFSend(unsigned long ET);
+void FFSend(unsigned long ET);
 void print_wakeup_reason();
 void Soundwakeup(void);
 void timesInit(void);
 void setFlashDefaults(void);
+unsigned long getEpochTime(void);
 
 #endif
