@@ -1,18 +1,17 @@
 
 #include <NimBLEDevice.h>
 #include <TickTwo.h>
-//#include <EasyNeoPixels.h>  //TODO change over to underlying adafruit library
+
 #include "Squeezer.h"
 //#include <Adafruit_NeoPixel.h>
 //#include <Button2.h>
 #include <HX711.h>  //this is non blocking.  hope it works
-// #if defined(ESP8266) || defined(ESP32) || defined(AVR)
-// #include <EEPROM.h>
-// #endif
-//I think EEPROM.h installed by default
 
-//ADC calibration
-// #include <esp_adc_cal.h>
+//See Sketch ADS1015_RPM_Multichannel
+#include <SparkFun_ADS1015_Arduino_Library.h> //Click here to get the library: http://librarymanager/All#SparkFun_ADS1015
+#include <Wire.h>
+ADS1015 adcSensor;
+int addr_rpm = 0X48,  sda_rpm  = 5, scl_rpm = 4;
 
 #include <Preferences.h>
 Preferences prefs;
@@ -126,7 +125,28 @@ void setup() {
   Serial.begin(115200);
   //Serial.printf("\nHello from Protocol Grip Trainer v25Jul24, time = \t%lu ms\n", (millis() - lagmsStart));
   Serial.println("Hello; PGT RevLevel =" + REV_LEVEL);
-  //NewBLE(SndBle, SndSer, "R:"+ REV_LEVEL); SndBle, SndSer bool, Arg is String(); this sends both.
+  
+  //setup ADS1015
+  Wire.begin(sda_rpm,scl_rpm);
+  
+    if (adcSensor.begin(0x48) == true) // 0x48 is default
+  
+  {
+    Serial.println("ADS1015 ADC found. I2C connections are good.");
+  }
+  else
+  {
+    Serial.println("ADS1015 not found. Check wiring. Stalled forever");
+    while (1); // stall out forever
+  }
+  // Set the Gain  
+  adcSensor.setGain(ADS1015_CONFIG_PGA_TWOTHIRDS );
+  //set the sample rate  
+  adcSensor.setSampleRate(ADS1015_CONFIG_RATE_1600HZ);
+
+  // For the fastest conversion timing, we need to check the Config Register Operational Status bit
+  // to see when the conversion is complete - instead of using a fixed delay.  
+  adcSensor.useConversionReady(true);
 
   ledcAttach(buzzPin, freq, resolution);  //eight bit resolution--why? (Jun24?); using for PWM
   setLED(00, clrs.GREEN);
@@ -179,7 +199,7 @@ void setup() {
   // Serial.printf("BLE advertising time = %lu ms\n", (millis()-lagmsStart));
 
   //set up flash
-  prefs.begin("BatADCScale");  //multiply adc float by this to get voltage
+  //prefs.begin("BatADCScale");  //multiply adc float by this to get voltage
  // Serial.println( "ADCalibration at start up =" +String(prefs.getFloat("BatADCScale")));
   prefs.begin("SSID");         //prefs library wants length of string
   prefs.begin("PWD");
@@ -218,7 +238,7 @@ void setup() {
 
   //Big Question:  What is the purpose of running the scale if no BLE connection?  Why not go directly to loop??
 
-  Serial.print(" Advertising for BLE connection).......");
+  Serial.print("....Advertising for BLE connection.......\n");
   BlinkTime = CNCT_LED_BLINK_TIME;
   setLED(250, clrs.BLUE);     //blinking for connect
   Serial.println("Revision level = " + REV_LEVEL);

@@ -25,7 +25,7 @@ void RxStringParse(void) {
     else if (tagStr == "BP") StringBLETX(BatSnsCk(), true);  // query only.
     else if (tagStr == "ET") SetEpochTime(valStr);
     else if (tagStr == "R") StringBLETX(("R:" + REV_LEVEL), true);  // this is a report--
-    else if (tagStr == "V") CalibrateADC(valStr);
+    // else if (tagStr == "V") CalibrateADC(valStr);
     else if (tagStr == "HF") SetHFRate(valStr);  //Set HF reporting Rate
     // else if (tagStr == "MR") SetMeanReportTime(valStr);  //Set Rate at which Mean is reported
     else if (tagStr == "MT") SetMeanTime(valStr);  // Seet Time over which Mean is calculated.
@@ -102,26 +102,26 @@ void SetEpochTime(String valStr) {
 }
 
 
-float getFloatADC(int numtimes) {
-  float adcavg = 0.0;
-  int i;  //old FORTRAN pgmr
-  for (i = 1; i <= numtimes; i++) {
-    adcavg = adcavg + (float)analogRead(BatSns);
-  }
-  return adcavg / numtimes;
-}
+// float getFloatADC(int numtimes) {
+//   float adcavg = 0.0;
+//   int i;  //old FORTRAN pgmr
+//   for (i = 1; i <= numtimes; i++) {
+//     adcavg = adcavg + (float)analogRead(BatSns);
+//   }
+//   return adcavg / numtimes;
+// }
 
-void CalibrateADC(String strval) {
-  float BatCalValue = 3.30;                                     //3.30 is default--use regulator output
-  if (strval.length() > 0) BatCalValue = atof(strval.c_str());  //stops at first non numeric
-                                                                // Serial.printf("Use Batt Value of %f volts for calibaration",BatCalValue);
-  int numrdgs = 10;                                             //probably needs to be in squeezer.h TODO
-  float adcrdg = getFloatADC(numrdgs);
-  BatSnsFactor = BatCalValue / adcrdg;  // l
-  Serial.printf("Calibrate ADC to %f Volts, CalFactor = %f adcraw average = %f over %d rdgs\n", BatCalValue, BatSnsFactor, adcrdg, numrdgs);
-  prefs.putFloat("BatADCScale", BatSnsFactor);
-  //TODO put the 3.75 default  and numrdg in defines
-}
+// void CalibrateADC(String strval) {
+//   float BatCalValue = 3.30;                                     //3.30 is default--use regulator output
+//   if (strval.length() > 0) BatCalValue = atof(strval.c_str());  //stops at first non numeric
+//                                                                 // Serial.printf("Use Batt Value of %f volts for calibaration",BatCalValue);
+//   int numrdgs = 10;                                             //probably needs to be in squeezer.h TODO
+//   float adcrdg = getFloatADC(numrdgs);
+//   BatSnsFactor = BatCalValue / adcrdg;  // l
+//   Serial.printf("Calibrate ADC to %f Volts, CalFactor = %f adcraw average = %f over %d rdgs\n", BatCalValue, BatSnsFactor, adcrdg, numrdgs);
+//   prefs.putFloat("BatADCScale", BatSnsFactor);
+//   //TODO put the 3.75 default  and numrdg in defines
+// }
 
 void SetSSID(String ValStr) {
   //S:Valstr; if Valstr ="", then revert to default--is this a good idea??
@@ -405,13 +405,11 @@ String BatSnsCk(void) {
 
   int battpcnt;
   int battvoltx100 = 0;  //batt volts *100, rounded to int
-  float battrdg = 0;     //raw
-
-  battrdg = getFloatADC(NumADCRdgs);
-  battvolts = battrdg * BatSnsFactor;
+  battvolts = adcSensor.getSingleEndedMillivolts(0);    //Batt_SW is on channel zero.
+  Serial.printf("VBAT_SW = %.0f millivolts\n",battvolts);
 
   //reference: https://blog.ampow.com/lipo-voltage-chart/
-  battvoltx100 = roundf(battvolts * 100);
+  battvoltx100 = roundf(battvolts/10);    //battvolts is in mv now
   battpcnt = 0;  //default
   if (battvoltx100 >= 420) battpcnt = 100;
   else if (battvoltx100 > 415) battpcnt = 95;
@@ -434,13 +432,14 @@ String BatSnsCk(void) {
   else if (battvoltx100 > 369) battpcnt = 10;
   else if (battvoltx100 > 361) battpcnt = 05;
 
-  Serial.printf("ADCRaw = %.1f\tbatt mult = %f\t batt volts = %.3f \t numrdgs = %d\t", battrdg, BatSnsFactor, battvolts, NumADCRdgs);
-  Serial.println("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
-  if (battpcnt < BattShutDownPcnt) GoToSleep(" Battery critically low = " + String((float)battvoltx100 / 100) + "volts; going to sleep");
+  //Serial.printf("ADCRaw = %.1f\tbatt mult = %f\t batt volts = %.3f \t numrdgs = %d\t", battrdg, BatSnsFactor, battvolts, NumADCRdgs);
+  //Serial.println("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
+  if (battpcnt < BattShutDownPcnt) GoToSleep(" Battery critically low = " + String(battvolts) + "millivolts; going to sleep");
   setLED(BlinkTime, clrs.BLUE);
   if (battpcnt < BattWarnPcnt) setLED(BlinkTime, clrs.YELLOW);
   if (battpcnt < BattCritPcnt) setLED(BlinkTime, clrs.RED);
   return String("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
+  
 }
 
 void GoToSleep(String DSmsg) {
@@ -591,12 +590,12 @@ void timesInit(void) {
 }
 
 void setFlashDefaults(void) {  //sets ADC, Scale defaults
-  BatSnsFactor = prefs.getFloat("BatADCScale");
-  if (isnan(BatSnsFactor) || (BatSnsFactor <= 0)) {
-    BatSnsFactor = BatMultDefault;
-    prefs.putFloat("BatADCScale", BatSnsFactor);
-    Serial.println("ADC Mult not initialized, using default = %f" + String(BatSnsFactor));
-  } else Serial.println("ADC flash calibration =" + String(BatSnsFactor, 6));
+  // BatSnsFactor = prefs.getFloat("BatADCScale");
+  // if (isnan(BatSnsFactor) || (BatSnsFactor <= 0)) {
+  //   BatSnsFactor = BatMultDefault;
+  //   prefs.putFloat("BatADCScale", BatSnsFactor);
+  //   Serial.println("ADC Mult not initialized, using default = %f" + String(BatSnsFactor));
+  // } else Serial.println("ADC flash calibration =" + String(BatSnsFactor, 6));
 
   scaleCalVal = prefs.getFloat("ScaleScale");
   if (isnan(scaleCalVal) || (scaleCalVal <= 0)) {  //scale cal should always be positive
