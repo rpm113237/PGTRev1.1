@@ -2,8 +2,7 @@
 #ifndef _SQUEEZER_H
 #define _SQUEEZER_H
 #include <Adafruit_NeoPixel.h>
-String REV_LEVEL = "4Nov24v1.2";  //actually, include last part of commit number
-
+String REV_LEVEL = "24Nov24 43b36a2";  //actually, include last part of commit number
 
 #define CNCT_LED_BLINK_TIME 1000     //BLINK TIME FOR CONNECT LED
 #define MS_TO_SEC 1000               //convert to secs

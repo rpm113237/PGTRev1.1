@@ -474,7 +474,7 @@ void SoundBuzz(u_long cwFreq, int sound_ms) {
 
 void Soundwakeup(void) {
   //the start button has been pushed
-  MorseChar('o');
+ MorseChar('o');
 }
 
 void SoundElement(int elementTime) {
