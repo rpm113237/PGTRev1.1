@@ -125,6 +125,38 @@ void setup() {
   Serial.begin(115200);
   //Serial.printf("\nHello from Protocol Grip Trainer v25Jul24, time = \t%lu ms\n", (millis() - lagmsStart));
   Serial.println("Hello; PGT RevLevel =" + REV_LEVEL);
+   // Create the BLE Device
+  BLEDevice::init("Squeezer");
+
+  // Create the BLE Server
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  // Create the BLE Service
+  BLEService* pService = pServer->createService(SERVICE_UUID);
+
+  // Create a BLE Characteristic
+  pTxCharacteristic = pService->createCharacteristic(
+    CHARACTERISTIC_UUID_TX,
+    NIMBLE_PROPERTY::NOTIFY
+    // BLECharacteristic::PROPERTY_NOTIFY
+  );
+
+  // pTxCharacteristic->addDescriptor(new BLE2902());  Not need with NIMBLE
+
+  BLECharacteristic* pRxCharacteristic = pService->createCharacteristic(
+    CHARACTERISTIC_UUID_RX,
+    NIMBLE_PROPERTY::WRITE);
+
+  pRxCharacteristic->setCallbacks(new MyCallbacks());
+
+  // Start the service
+  pService->start();
+
+  // Start advertising
+  pServer->getAdvertising()->start();
+  // Serial.printf("BLE advertising time = %lu ms\n", (millis()-lagmsStart));
+
   
   //setup ADS1015
   Wire.begin(sda_rpm,scl_rpm);
@@ -166,38 +198,7 @@ void setup() {
   BattChecker.start();  //start Batt checker
   SleepChecker.start();  //start sleepchecker
 
-  // Create the BLE Device
-  BLEDevice::init("Squeezer");
-
-  // Create the BLE Server
-  pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
-
-  // Create the BLE Service
-  BLEService* pService = pServer->createService(SERVICE_UUID);
-
-  // Create a BLE Characteristic
-  pTxCharacteristic = pService->createCharacteristic(
-    CHARACTERISTIC_UUID_TX,
-    NIMBLE_PROPERTY::NOTIFY
-    // BLECharacteristic::PROPERTY_NOTIFY
-  );
-
-  // pTxCharacteristic->addDescriptor(new BLE2902());  Not need with NIMBLE
-
-  BLECharacteristic* pRxCharacteristic = pService->createCharacteristic(
-    CHARACTERISTIC_UUID_RX,
-    NIMBLE_PROPERTY::WRITE);
-
-  pRxCharacteristic->setCallbacks(new MyCallbacks());
-
-  // Start the service
-  pService->start();
-
-  // Start advertising
-  pServer->getAdvertising()->start();
-  // Serial.printf("BLE advertising time = %lu ms\n", (millis()-lagmsStart));
-
+ 
   //set up flash
   //prefs.begin("BatADCScale");  //multiply adc float by this to get voltage
  // Serial.println( "ADCalibration at start up =" +String(prefs.getFloat("BatADCScale")));

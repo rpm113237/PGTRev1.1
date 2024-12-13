@@ -101,28 +101,6 @@ void SetEpochTime(String valStr) {
   //Force.EpochTime - millis() - Force.EpochStart;
 }
 
-
-// float getFloatADC(int numtimes) {
-//   float adcavg = 0.0;
-//   int i;  //old FORTRAN pgmr
-//   for (i = 1; i <= numtimes; i++) {
-//     adcavg = adcavg + (float)analogRead(BatSns);
-//   }
-//   return adcavg / numtimes;
-// }
-
-// void CalibrateADC(String strval) {
-//   float BatCalValue = 3.30;                                     //3.30 is default--use regulator output
-//   if (strval.length() > 0) BatCalValue = atof(strval.c_str());  //stops at first non numeric
-//                                                                 // Serial.printf("Use Batt Value of %f volts for calibaration",BatCalValue);
-//   int numrdgs = 10;                                             //probably needs to be in squeezer.h TODO
-//   float adcrdg = getFloatADC(numrdgs);
-//   BatSnsFactor = BatCalValue / adcrdg;  // l
-//   Serial.printf("Calibrate ADC to %f Volts, CalFactor = %f adcraw average = %f over %d rdgs\n", BatCalValue, BatSnsFactor, adcrdg, numrdgs);
-//   prefs.putFloat("BatADCScale", BatSnsFactor);
-//   //TODO put the 3.75 default  and numrdg in defines
-// }
-
 void SetSSID(String ValStr) {
   //S:Valstr; if Valstr ="", then revert to default--is this a good idea??
   if (ValStr.length() > 0) strcpy(SSstr, ValStr.c_str());
@@ -219,6 +197,7 @@ void ConnectWiFi(void) {
 void BLEReconnect(void) {
   //attempt to reconnect
   //not sure if it works.
+  //Serial.printf("BLEreconnect; deviceConnected = %d\t oldDeviceConnected = %d\n", deviceConnected, oldDeviceConnected);
   if (!deviceConnected && oldDeviceConnected) {
     delay(10);                    // give the bluetooth stack the chance to get things ready
     pServer->startAdvertising();  // restart advertising
