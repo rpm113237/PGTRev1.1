@@ -28,11 +28,27 @@ void RxStringParse(void) {
     // else if (tagStr == "V") CalibrateADC(valStr);
     else if (tagStr == "HF") SetHFRate(valStr);  //Set HF reporting Rate
     // else if (tagStr == "MR") SetMeanReportTime(valStr);  //Set Rate at which Mean is reported
-    else if (tagStr == "MT") SetMeanTime(valStr);  // Seet Time over which Mean is calculated.
+    else if (tagStr == "MT") SetMeanTime(valStr);      // Seet Time over which Mean is calculated.
+    else if (tagStr == "NUM") SetBootNum(valStr);      //Set BootNum; if null reset
+    else if (tagStr == "TT") SetTotalRunTime(valStr);  //set Total Run Time; if null reset
     else Serial.println("Unknown Tag =" + tagStr);
     rxValue.clear();  //erases
   }
 }
+
+void SetBootNum(String valStr) {  //mean calculation time (seconds)  
+  bootCount = atoi(valStr.c_str());   //atoi returns zero if invalid  
+  prefs.putUInt("NumBoots", bootCount);
+}
+
+void SetTotalRunTime(String valStr) {  //mean calculation time (seconds)  
+char *end;
+  Force.TotalRuntime = strtoll(valStr.c_str(), &end,0);   //atoi returns zero if invalid  
+  prefs.putUInt("TotalRunTime", Force.TotalRuntime);
+  //end of run will update to time in THIS run.
+}
+
+
 void SetMeanTime(String valStr) {  //mean calculation time (seconds)
   if (valStr.length() > 0) {
     if (atoi(valStr.c_str()) > 0) {
@@ -380,7 +396,7 @@ String BatSnsCk(void) {
 void GoToSleep(String DSmsg) {
 
   Serial.println(DSmsg);  // tell why shutting down.
-  unsigned long runtime = (Force.TotalRuntime + (millis() - Force.EpochStart)/(unsigned long) (60000));
+  unsigned long runtime = (Force.TotalRuntime + (millis() - Force.EpochStart) / (unsigned long)(60000));
   // Serial.println("Elapsed time in ms this run = "+ String(millis()-Force.EpochStart));
   // Serial.println("Force.TotalRuntime @ shutdown =" + String(runtime));
   prefs.putULong("TotalRunTime", runtime);
