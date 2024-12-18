@@ -1,27 +1,18 @@
 
+#include <stdint.h>
 #include <NimBLEDevice.h>
 #include <TickTwo.h>
-
 #include "Squeezer.h"
-//#include <Adafruit_NeoPixel.h>
-//#include <Button2.h>
-#include <HX711.h>  //this is non blocking.  hope it works
-
-//See Sketch ADS1015_RPM_Multichannel
-#include <SparkFun_ADS1015_Arduino_Library.h> //Click here to get the library: http://librarymanager/All#SparkFun_ADS1015
+#include <Adafruit_NeoPixel.h>
+#include <HX711.h>  
+#include <SparkFun_ADS1015_Arduino_Library.h>  //See Sketch ADS1015_RPM_Multichannel
 #include <Wire.h>
-ADS1015 adcSensor;
-int addr_rpm = 0X48,  sda_rpm  = 5, scl_rpm = 4;
-
 #include <Preferences.h>
-Preferences prefs;
-
 //OTA includes--taken from ElegantOTA demo example
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WebServer.h>
 #include <ElegantOTA.h>
-WebServer server(80);
 
 // if it is the C3 or other single core ESP32" Use core 0
 #if CONFIG_FREERTOS_UNICORE
@@ -31,27 +22,20 @@ static const BaseType_t app_cpu = 1;
 #endif
 //the c3 seems to run on 0 regardless of where it is set.
 
+ADS1015 adcSensor;
 
-// define ledticker, battchecker, vibReport--have to have protos in .h
-//MeanReport, etc. is called every millis; Actual sending is a timer in the sub
-//Haven't looked at library, but I think the call rate of TickTwo isn't modifieable
+Preferences prefs;
+
+WebServer server(80);
+
+HX711 scale;
+
+Adafruit_NeoPixel pixels(NEOPIXELS, NEOPIN, NEO_GRB + NEO_KHZ800);  //1 ea sk6812 on IO 8
+
 
 TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);  //calls LEDBlink, called every 10MS, repeats forever, resolution MS
-
-// TickTwo MeanReport(MeanSend, 1, 0, MILLIS);  //send vibration data every VIB_SND_INTERVAL (ms), forever
-// TickTwo HFReport(HFSend, 1, 0, MILLIS);
-// TickTwo FFReport(FFSend, 1, 0, MILLIS);
-
-
 TickTwo BattChecker(BatSnsCk, Batt_CK_Interval, 0, MILLIS);  //checks battery every Batt_Ck_Interval
-
 TickTwo SleepChecker(RunTimeCheck, 10000, 0, MILLIS);  //check sleeptimers every ten seconds
-
-
-//construct Button2
-//Button2 button;   //StartButton
-//comment--why not just handle it as an input? In Rev 1 what does it do other than START?
-
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pTxCharacteristic;
@@ -62,7 +46,6 @@ String rxValue{};  // so can process outside of callback; maybe not the best ide
 
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
-//TODO Get own UID's
 
 #define SERVICE_UUID "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"  //  Nordic UART service UUID
 #define CHARACTERISTIC_UUID_RX "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
@@ -71,9 +54,6 @@ String rxValue{};  // so can process outside of callback; maybe not the best ide
 // #define SERVICE_UUID "b56340e0-38a7-11ee-be56-0242ac120002"  // Custom UUID's.  nrfconnect and lightblue require Nordic's UART UUID
 // #define CHARACTERISTIC_UUID_RX "b5634374-38a7-11ee-be56-0242ac120002" // to display strings.
 // #define CHARACTERISTIC_UUID_TX "b56344a0-38a7-11ee-be56-0242ac120002"
-
-
-
 
 /**  None of these are required as they will be handled by the library with defaults. **
  **                       Remove as you see fit for your needs                        */
@@ -114,98 +94,80 @@ class MyCallbacks : public BLECharacteristicCallbacks {
   }
 };
 
-HX711 scale;
 
 // the setup function runs once when you press reset or power the board
 void setup() {
-
-
   // initialize serial communication at 115200 bits per second:
   u_long lagmsStart = millis();
+  pinMode(StartButton, INPUT);
+  pinMode(ShutDownPin, OUTPUT);    //pulled down with 100K, has to be active high
+  digitalWrite(ShutDownPin, LOW);  // race against release. switch should still be closed.
   Serial.begin(115200);
-  //Serial.printf("\nHello from Protocol Grip Trainer v25Jul24, time = \t%lu ms\n", (millis() - lagmsStart));
+  while (digitalRead(StartButton) == HIGH);// Serial.println("Waiting Start Button Release");
   Serial.println("Hello; PGT RevLevel =" + REV_LEVEL);
-   // Create the BLE Device
-  BLEDevice::init("Squeezer");
 
+  ledcAttach(buzzPin, freq, resolution);  //eight bit resolution--why? (Jun24?); using for PWM
+  setLED(00, clrs.GREEN);
+  LEDBlink();             //Give them a green.  
+  Soundwakeup();          //wake up feedback
+
+  print_wakeup_reason();  //output and store wakeup count
+
+  // Create the BLE Device
+  BLEDevice::init("Squeezer");
   // Create the BLE Server
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
-
   // Create the BLE Service
   BLEService* pService = pServer->createService(SERVICE_UUID);
-
   // Create a BLE Characteristic
   pTxCharacteristic = pService->createCharacteristic(
     CHARACTERISTIC_UUID_TX,
     NIMBLE_PROPERTY::NOTIFY
     // BLECharacteristic::PROPERTY_NOTIFY
   );
-
-  // pTxCharacteristic->addDescriptor(new BLE2902());  Not need with NIMBLE
-
-  BLECharacteristic* pRxCharacteristic = pService->createCharacteristic(
+   BLECharacteristic* pRxCharacteristic = pService->createCharacteristic(
     CHARACTERISTIC_UUID_RX,
     NIMBLE_PROPERTY::WRITE);
 
   pRxCharacteristic->setCallbacks(new MyCallbacks());
-
   // Start the service
   pService->start();
-
   // Start advertising
   pServer->getAdvertising()->start();
   // Serial.printf("BLE advertising time = %lu ms\n", (millis()-lagmsStart));
 
-  
   //setup ADS1015
-  Wire.begin(sda_rpm,scl_rpm);
-  
-    if (adcSensor.begin(0x48) == true) // 0x48 is default
-  
+  Wire.begin(sda_rpm, scl_rpm);
+  if (adcSensor.begin(ADC_addr_rpm) == true)  // 0x48 is default
   {
     Serial.println("ADS1015 ADC found. I2C connections are good.");
-  }
-  else
-  {
+  } else {
     Serial.println("ADS1015 not found. Check wiring. Stalled forever");
-    while (1); // stall out forever
+    while (1);  // stall out forever
   }
-  // Set the Gain  
-  adcSensor.setGain(ADS1015_CONFIG_PGA_TWOTHIRDS );
-  //set the sample rate  
+  // Set the Gain
+  adcSensor.setGain(ADS1015_CONFIG_PGA_TWOTHIRDS);
+  //set the sample rate
   adcSensor.setSampleRate(ADS1015_CONFIG_RATE_1600HZ);
 
   // For the fastest conversion timing, we need to check the Config Register Operational Status bit
-  // to see when the conversion is complete - instead of using a fixed delay.  
-  adcSensor.useConversionReady(true);
-
-  ledcAttach(buzzPin, freq, resolution);  //eight bit resolution--why? (Jun24?); using for PWM
-  setLED(00, clrs.GREEN);
-  LEDBlink();             //Give them a green.
-  print_wakeup_reason();  //store wakeup count
-  Soundwakeup();          //wake up feedback
+  // to see when the conversion is complete - instead of using a fixed delay.
+  adcSensor.useConversionReady(true);  
   //Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));
-  pinMode(StartButton, INPUT);
-  pinMode (RatePin, OUTPUT);
-
-  if (BaseSampleRate ==10)digitalWrite(RatePin, LOW);
-  else if (BaseSampleRate ==80) digitalWrite(RatePin, HIGH);
-  else Serial.println ("Unknown Base Rate ="+String(BaseSampleRate));
-
+    
   //start the TickTwo timers
-  LEDtimer.start();     //start LED timer
-  BattChecker.start();  //start Batt checker
+  LEDtimer.start();      //start LED timer
+  BattChecker.start();   //start Batt checker
   SleepChecker.start();  //start sleepchecker
-
- 
   //set up flash
   //prefs.begin("BatADCScale");  //multiply adc float by this to get voltage
- // Serial.println( "ADCalibration at start up =" +String(prefs.getFloat("BatADCScale")));
-  prefs.begin("SSID");         //prefs library wants length of string
+  // Serial.println( "ADCalibration at start up =" +String(prefs.getFloat("BatADCScale")));
+  prefs.begin("SSID");  //prefs library wants length of string
   prefs.begin("PWD");
   prefs.begin("RunTime");  //run time in minutes? 10K minutes = 166hrs.  Not long enough.
   prefs.begin("ScaleScale");
+  prefs.begin("NumBoots"); //number of time the unit has powered up
   //Serial.println( "Scale Calibration at start up =" + String(prefs.getFloat("ScaleScale")));
   setFlashDefaults();
 
@@ -216,15 +178,15 @@ void setup() {
   Serial.printf("PWD = %s \n", PWDstr);
 
   //set up the scale
+  pinMode(RatePin, OUTPUT);
+  if (BaseSampleRate == 10) digitalWrite(RatePin, LOW);
+  else if (BaseSampleRate == 80) digitalWrite(RatePin, HIGH);
+  else Serial.println("Unknown Base Rate =" + String(BaseSampleRate));
 
   scale.begin(HX711_dout, HX711_sck);
   scale.reset();  //if coming out of deep sleep; scale might be powered down
-  // Serial.print("read average of 10--stabilize: \t\t");
-
-  //************* to stand out in log
   scale.tare(NumTare);  // reset the scale to 0
-  //Serial.printf("Scale tared, offset = %ld ", scale.get_offset());
-  //Serial.printf("Warm up read= %dX\tval = %.2f\tTared %d times\n",NumWarmup, scale.read_average(NumWarmup), NumTare);  // print the average of 10 readings from the ADC
+  
   scaleCalVal = prefs.getFloat("ScaleScale");
   if (isnan(scaleCalVal)) {
     Serial.println("Scale Cal not loaded, use default--check default typicality");
@@ -241,31 +203,31 @@ void setup() {
 
   Serial.print("....Advertising for BLE connection.......\n");
   BlinkTime = CNCT_LED_BLINK_TIME;
-  setLED(250, clrs.BLUE);     //blinking for connect
+  setLED(250, clrs.BLUE);  //blinking for connect
   Serial.println("Revision level = " + REV_LEVEL);
   Serial.println(BatSnsCk());  //sets color for connect led
   //BatSnsCk();   //do once on start up--doesn't report.
-  
-  timesInit(); //
+
+  timesInit();  //
 }
 
 //**************loop()***************************************
 void loop() {
-  BLEReconnect();         //
-  ResetSwitch();          //check for OFF
-  RxStringParse();        //check for orders from the boss (App)
-  
-  CheckForce();  //check force updates force structure 
-  unsigned long lclET = getEpochTime();   //Epoch time stamp (ms)--could be done in CheckForce??
+  BLEReconnect();   //
+  ResetSwitch();    //check for OFF
+  RxStringParse();  //check for orders from the boss (App)
+
+  CheckForce();                          //check force updates force structure
+  unsigned long lclET = getEpochTime();  //Epoch time stamp (ms)--could be done in CheckForce??
 
   FFSend(lclET);  // put send once in FFSend
   HFSend(lclET);
   MeanSend(lclET);
-  
+
   BattChecker.update();   // BatSnsCk checks battery, doesn't send voltage--voltage send is query
   LEDtimer.update();      //should call the ledBlink every 10ms.
   SleepChecker.update();  //check for timeout
-  
-  
-  
+
+
+
 }  //end of loop

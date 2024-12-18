@@ -1,7 +1,6 @@
-#include <stdint.h>
 #ifndef _SQUEEZER_H
 #define _SQUEEZER_H
-#include <Adafruit_NeoPixel.h>
+//#include <Adafruit_NeoPixel.h>
 String REV_LEVEL = "24Nov24 43b36a2";  //actually, include last part of commit number
 
 #define CNCT_LED_BLINK_TIME 1000     //BLINK TIME FOR CONNECT LED
@@ -33,11 +32,22 @@ const int NumWarmup = 10;
 const int NumTare = 10;
 char TxString[25];  // used to transmit
 
+//efine pins
 //HX711 pins:
 const int HX711_dout = 7;  //mcu > HX711 dout pin
 const int HX711_sck = 3;   //mcu > HX711 sck pin
+//GPIO
+const int StartButton = 1;  //
+const int ShutDownPin = 18;
+const int buzzPin = 19;
+const int RatePin = 10;  // = 0 for 10 sps, 1 for 80 sps
+//NeoPins
+const int NEOPIN = 8; 
+const int NEOPIXELS = 1;    //One LED
 
-
+const int ADC_addr_rpm = 0X48;
+const int sda_rpm = 5;
+const int scl_rpm = 4;
 struct ForceStruct {
   /* Force is accumulated and averages calculated based on scale. Reporting is synchronous tied to TickTwo
   for now; ony rate for FF, HF is settable; the report time will be set as (1000/rate) milliseconds.
@@ -79,12 +89,6 @@ int freq = 500;
 const int ledChannel = 0;
 const int resolution = 8;
 const int dutycycle = 127;  //50 percent +/-
-const int buzzPin = 19;
-const int RatePin = 10;  // = 0 for 10 sps, 1 for 80 sps
-
-const int NEOPIN = 8;                                               //
-const int NEOPIXELS = 2;                                            //two led's
-Adafruit_NeoPixel pixels(NEOPIXELS, NEOPIN, NEO_GRB + NEO_KHZ800);  //2 ea sk6812 on pin 8
 
 struct COLORS {
   int RED[3] = { 255, 0, 0 };
@@ -114,10 +118,6 @@ const int BattShutDownPcnt = 20;  //go to Sleep.pcnt
 #define Battmah 1000
 #define Runmah 70
 #define BattFullTime (Battmah / Runmah) * 60  //in minutes
-
-
-const int StartButton = 1;  //
-const int FastPin = 18;     //set =1 for 80 samplses/sec
 
 uint16_t SleepTimer;          // in seconds reset if HF> MinForce
 uint32_t SleepTimeMax = 300;  //sleep timeout in sec

@@ -15,7 +15,7 @@ void RxStringParse(void) {
     if (rxValue.length() > (indxsemi + 1)) {
       valStr = rxValue.substring((indxsemi + 1), rxValue.length());
     } else valStr = "";  //null for checking
-    if (tagStr == "X") GoToSleep("App X cmd , Going to Deep Sleep");
+    if (tagStr == "X") GoToSleep("The Boss said GoodNight, power off");
     else if (tagStr == "S") SetSSID(valStr);
     else if (tagStr == "P") SetPwd(valStr);
     else if (tagStr == "O") DoOTA();
@@ -124,9 +124,9 @@ void SetPwd(String ValStr) {
 
 void ResetSwitch(void) {
 
-  if ((digitalRead(StartButton) == LOW)) {
+  if ((digitalRead(StartButton) == HIGH)) {
     //Serial.printf("Start button is LOW, Go To Sleep\n");
-    GoToSleep("Start button is LOW, Go To Sleep");
+    GoToSleep("Start button is PRESSED, Power Down\t TODO flash boot count");
   }
 }
 
@@ -422,19 +422,23 @@ String BatSnsCk(void) {
 }
 
 void GoToSleep(String DSmsg) {
-  scale.power_down();     //should be anyway
+  //scale.power_down();     //should be anyway
   Serial.println(DSmsg);  // tell why shutting down.
+  Serial.println("Goodbye Cruel World");
+  //delay(10);
+
   //pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));  //turn LED's OFF
 
-  pixels.clear();
-  pixels.show();  // Send the updated pixel colors to the hardware.
+  //pixels.clear();
+  //pixels.show();  // Send the updated pixel colors to the hardware.
   MorseChar(SHAVE_HAIRCUT);
-  ledcDetach(buzzPin);  //disconnect the PWM
-  pinMode(buzzPin, INPUT_PULLDOWN);
+  digitalWrite(ShutDownPin,HIGH);
+  // ledcDetach(buzzPin);  //disconnect the PWM
+  // pinMode(buzzPin, INPUT_PULLDOWN);
   //digitalWrite(buzzPin, LOW);  //Make the buzzer low.
   //Serial.printf("******Low Battery Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
-  esp_deep_sleep_enable_gpio_wakeup(1 << StartButton, ESP_GPIO_WAKEUP_GPIO_LOW);
-  esp_deep_sleep_start();
+  // esp_deep_sleep_enable_gpio_wakeup(1 << StartButton, ESP_GPIO_WAKEUP_GPIO_LOW);
+  // esp_deep_sleep_start();
   Serial.println("This never happens");
 }
 
@@ -537,7 +541,7 @@ void RunTimeCheck() {
   }
   if (runtimeseconds > SleepTimeMax) {
     //Serial.printf("No activity for %lu seconds, go to sleep\n", SleepTimeMax);
-    GoToSleep("No activity for " + (String)SleepTimeMax + "seconds, go to sleep");
+    GoToSleep("No activity for " + (String)SleepTimeMax + "seconds, power down");
   }
 }
 
