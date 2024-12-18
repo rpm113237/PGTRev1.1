@@ -47,18 +47,6 @@ void SetMeanTime(String valStr) {  //mean calculation time (seconds)
   }
 }
 
-// void SetMeanReportTime(String valStr) {  //mean report time milliseconds
-//   if (valStr.length() > 0) {
-//     if (atoi(valStr.c_str()) > 0) {
-//       Force.MeanReportTime = atoi(valStr.c_str());
-//       Force.MeanReport = true;
-//     }
-//     //if samp rate = 80; rate = 5--> scaleSamples = 16
-//   } else {
-//     Force.MeanReport = false;
-//   }
-//}
-
 void SetHFRate(String valStr) {
   if (valStr.length() > 0) {
     if (atoi(valStr.c_str()) > 0) {
@@ -121,6 +109,7 @@ void SetPwd(String ValStr) {
   Serial.println("SetPWD string = " + tempStr);
   return;
 }
+
 
 void ResetSwitch(void) {
 
@@ -324,33 +313,7 @@ void StringBLETX(String msg, bool SndSer) {
 
 void print_wakeup_reason() {
 
-  Serial.printf("Boot number: %d\n", ++bootCount);
-
-  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-
-  switch (wakeup_reason) {
-    case ESP_SLEEP_WAKEUP_EXT0:
-      Serial.println("Wakeup caused by external signal using RTC_IO");
-      break;
-    case ESP_SLEEP_WAKEUP_EXT1:
-      Serial.println("Wakeup caused by external signal using RTC_CNTL");
-      break;
-    case ESP_SLEEP_WAKEUP_TIMER:
-      Serial.println("Wakeup caused by timer");
-      break;
-    case ESP_SLEEP_WAKEUP_TOUCHPAD:
-      Serial.println("Wakeup caused by touchpad");
-      break;
-    case ESP_SLEEP_WAKEUP_GPIO:  // 05 - this is used by ESP32-C3 as EXT0/EXT1 does not available in C3
-      Serial.printf("***Wakeup number %d by GPIO %d  ***\n", ++bootCount, StartButton);
-      break;
-    case ESP_SLEEP_WAKEUP_ULP:
-      Serial.println("Wakeup caused by ULP program");
-      break;
-    default:
-      Serial.printf("Wakeup was not caused by deep sleep; reason code = %d\n", wakeup_reason);
-      break;
-  }
+  //see https://espressif-docs.readthedocs-hosted.com/projects/arduino-esp32/en/latest/api/reset_reason.html
   esp_reset_reason_t reset_reason = esp_reset_reason();  //this should only be for non deep sleep.
 
   switch (reset_reason) {
@@ -366,30 +329,24 @@ void print_wakeup_reason() {
     case ESP_RST_PANIC:
       Serial.println("Software Exception due to exception/panic");
       break;
-    // case ESP_RST_:  // 05 - this is used by ESP32-C3 as EXT0/EXT1 does not available in C3
-    //   Serial.printf("***Wakeup number %d by GPIO %d  ***\n", ++bootCount, StartButton);
-    //   break;
-    // case ESP_RST_:
-    //   Serial.println("Wakeup caused by ULP program");
-    //   break;
+
     default:
-      Serial.printf("Wakeup was not caused by deep sleep; reason code = %d\n", wakeup_reason);
+      Serial.printf("Reset Default reason code = %d\n", reset_reason);
       break;
   }
 }
 
 
-
 String BatSnsCk(void) {
 
   int battpcnt;
-  int battvoltx100 = 0;  //batt volts *100, rounded to int
-  battvolts = adcSensor.getSingleEndedMillivolts(0);    //Batt_SW is on channel zero.
-  Serial.printf("VBAT_SW = %.0f millivolts\n",battvolts);
+  int battvoltx100 = 0;                               //batt volts *100, rounded to int
+  battvolts = adcSensor.getSingleEndedMillivolts(0);  //Batt_SW is on channel zero.
+  Serial.printf("VBAT_SW = %.0f millivolts\n", battvolts);
 
   //reference: https://blog.ampow.com/lipo-voltage-chart/
-  battvoltx100 = roundf(battvolts/10);    //battvolts is in mv now
-  battpcnt = 0;  //default
+  battvoltx100 = roundf(battvolts / 10);  //battvolts is in mv now
+  battpcnt = 0;                           //default
   if (battvoltx100 >= 420) battpcnt = 100;
   else if (battvoltx100 > 415) battpcnt = 95;
   else if (battvoltx100 > 411) battpcnt = 90;
@@ -418,27 +375,17 @@ String BatSnsCk(void) {
   if (battpcnt < BattWarnPcnt) setLED(BlinkTime, clrs.YELLOW);
   if (battpcnt < BattCritPcnt) setLED(BlinkTime, clrs.RED);
   return String("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
-  
 }
 
 void GoToSleep(String DSmsg) {
-  //scale.power_down();     //should be anyway
+
   Serial.println(DSmsg);  // tell why shutting down.
-  Serial.println("Goodbye Cruel World");
-  //delay(10);
-
-  //pixels.setPixelColor(LEDSelect, pixels.Color(clrs.OFF[0], clrs.OFF[1], clrs.OFF[2]));  //turn LED's OFF
-
-  //pixels.clear();
-  //pixels.show();  // Send the updated pixel colors to the hardware.
+  unsigned long runtime = (Force.TotalRuntime + (millis() - Force.EpochStart)/(unsigned long) (60000));
+  // Serial.println("Elapsed time in ms this run = "+ String(millis()-Force.EpochStart));
+  // Serial.println("Force.TotalRuntime @ shutdown =" + String(runtime));
+  prefs.putULong("TotalRunTime", runtime);
   MorseChar(SHAVE_HAIRCUT);
-  digitalWrite(ShutDownPin,HIGH);
-  // ledcDetach(buzzPin);  //disconnect the PWM
-  // pinMode(buzzPin, INPUT_PULLDOWN);
-  //digitalWrite(buzzPin, LOW);  //Make the buzzer low.
-  //Serial.printf("******Low Battery Deep Sleep; wakeup by GPIO %d*****\n", StartButton);
-  // esp_deep_sleep_enable_gpio_wakeup(1 << StartButton, ESP_GPIO_WAKEUP_GPIO_LOW);
-  // esp_deep_sleep_start();
+  digitalWrite(ShutDownPin, HIGH);  //power off
   Serial.println("This never happens");
 }
 
@@ -456,7 +403,7 @@ void SoundBuzz(u_long cwFreq, int sound_ms) {
 
 void Soundwakeup(void) {
   //the start button has been pushed
- MorseChar('o');
+  MorseChar('o');
 }
 
 void SoundElement(int elementTime) {
@@ -572,13 +519,8 @@ void timesInit(void) {
   Force.MeanLastReport = millis();
 }
 
-void setFlashDefaults(void) {  //sets ADC, Scale defaults
-  // BatSnsFactor = prefs.getFloat("BatADCScale");
-  // if (isnan(BatSnsFactor) || (BatSnsFactor <= 0)) {
-  //   BatSnsFactor = BatMultDefault;
-  //   prefs.putFloat("BatADCScale", BatSnsFactor);
-  //   Serial.println("ADC Mult not initialized, using default = %f" + String(BatSnsFactor));
-  // } else Serial.println("ADC flash calibration =" + String(BatSnsFactor, 6));
+void setFlashDefaults(void)  //sets Scale defaults, prints out bootnum, runtime
+{
 
   scaleCalVal = prefs.getFloat("ScaleScale");
   if (isnan(scaleCalVal) || (scaleCalVal <= 0)) {  //scale cal should always be positive
@@ -587,4 +529,9 @@ void setFlashDefaults(void) {  //sets ADC, Scale defaults
     Serial.println("Scale Cal not initialized, using default = " + String(scaleCalVal, 2));
   } else Serial.println("Scale flash calibration = " + String(scaleCalVal));
   scale.set_scale(scaleCalVal);
+  bootCount = prefs.getUInt("NumBoots") + 1;
+  prefs.putUInt("NumBoots", bootCount);
+  Serial.println("Boot Number = " + String(bootCount));
+  Force.TotalRuntime = prefs.getULong("TotalRunTime");
+  Serial.println("Total Run Time @ boot = " + String(Force.TotalRuntime));
 }

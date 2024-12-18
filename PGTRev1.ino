@@ -165,7 +165,7 @@ void setup() {
   // Serial.println( "ADCalibration at start up =" +String(prefs.getFloat("BatADCScale")));
   prefs.begin("SSID");  //prefs library wants length of string
   prefs.begin("PWD");
-  prefs.begin("RunTime");  //run time in minutes? 10K minutes = 166hrs.  Not long enough.
+  prefs.begin("TotalRunTime");  //run time in minutes? 10K minutes = 166hrs.  Not long enough.
   prefs.begin("ScaleScale");
   prefs.begin("NumBoots"); //number of time the unit has powered up
   //Serial.println( "Scale Calibration at start up =" + String(prefs.getFloat("ScaleScale")));

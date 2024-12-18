@@ -19,7 +19,7 @@ const int DfltMeanTime = 2;  // Note--period as opposed to Time
 const String DefaultSSID = "McClellan_Workshop";
 const String DefaultPWD = "Rangeland1";
 
-RTC_DATA_ATTR int bootCount = 0;  //keep track of how many times since power on TODO--put this in flash
+unsigned int bootCount = 0;  //keep track of how many times since power on TODO--put this in flash
 
 unsigned long oldmillis;        //to time the states
 unsigned long int el_time = 0;  //elapsed time
@@ -52,8 +52,9 @@ struct ForceStruct {
   /* Force is accumulated and averages calculated based on scale. Reporting is synchronous tied to TickTwo
   for now; ony rate for FF, HF is settable; the report time will be set as (1000/rate) milliseconds.
   */
-  unsigned long EpochStart;       //Start of PGT EpochStart
+  unsigned long EpochStart;       //Start of PGT EpochStart in ms
   unsigned long EpochTime;        //in ms == millis()-EpochStartTime
+  unsigned long TotalRuntime;     //in seconds, in flash, updated at shutdown = millis() - epochstart
   int BaseRate = BaseSampleRate;  //for Rev1--10 BASERATE #define 80--this is obsolete, I think
   //float BaseVal;  //updated every sample
 
