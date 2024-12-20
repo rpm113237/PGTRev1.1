@@ -398,11 +398,11 @@ void GoToSleep(String DSmsg) {
   Serial.println(DSmsg);  // tell why shutting down.
   unsigned long runtime = (Force.TotalRuntime + (millis() - Force.EpochStart) / (unsigned long)(60000));
   // Serial.println("Elapsed time in ms this run = "+ String(millis()-Force.EpochStart));
-  // Serial.println("Force.TotalRuntime @ shutdown =" + String(runtime));
+  Serial.println("Force.TotalRuntime @ shutdown =" + String(runtime));
   prefs.putULong("TotalRunTime", runtime);
   MorseChar(SHAVE_HAIRCUT);
   digitalWrite(ShutDownPin, HIGH);  //power off
-  Serial.println("This never happens");
+  Serial.println("This never happens");   //actually, does because voltage takes a little while to drop
 }
 
 void SoundBuzz(u_long cwFreq, int sound_ms) {
