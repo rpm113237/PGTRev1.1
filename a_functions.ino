@@ -2,7 +2,7 @@ void RxStringParse(void) {
 
   String tagStr = "";
   String valStr = "";
-  ;  //C:12.3; C is tag, 12.3 is val
+   //C:12.3; C is tag, 12.3 is val
 
   if ((rxValue.length() > 0)) {  //nothing to do if len = 0
     //Serial.println("rxValue " + rxValue);
@@ -28,7 +28,7 @@ void RxStringParse(void) {
     // else if (tagStr == "V") CalibrateADC(valStr);
     else if (tagStr == "HF") SetHFRate(valStr);  //Set HF reporting Rate
     // else if (tagStr == "MR") SetMeanReportTime(valStr);  //Set Rate at which Mean is reported
-    else if (tagStr == "MT") SetMeanTime(valStr);      // Seet Time over which Mean is calculated.
+    else if (tagStr == "MT") SetMeanTime(valStr);      // Set Time over which Mean is calculated.
     else if (tagStr == "NUM") SetBootNum(valStr);      //Set BootNum; if null reset
     else if (tagStr == "TT") SetTotalRunTime(valStr);  //set Total Run Time; if null reset
     else Serial.println("Unknown Tag =" + tagStr);
