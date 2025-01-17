@@ -34,15 +34,15 @@ char TxString[25];  // used to transmit
 
 //efine pins
 //HX711 pins:
-const int HX711_dout = 7;  //mcu > HX711 dout pin
-const int HX711_sck = 3;   //mcu > HX711 sck pin
+const int HX711_dout = 39;  //mcu > HX711 dout pin
+const int HX711_sck = 38;   //mcu > HX711 sck pin
 //GPIO
-const int StartButton = 1;  //
+const int StartButton = 21;  //
 const int ShutDownPin = 18;
-const int buzzPin = 19;
-const int RatePin = 10;  // = 0 for 10 sps, 1 for 80 sps
+const int buzzPin = 48;
+const int RatePin = 45;  // = 0 for 10 sps, 1 for 80 sps
 //NeoPins
-const int NEOPIN = 8; 
+const int NEOPIN = 47; 
 const int NEOPIXELS = 1;    //One LED
 
 //const int ADC_addr_rpm = 0X48;

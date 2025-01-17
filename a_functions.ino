@@ -263,7 +263,7 @@ void FFSend(unsigned long ET) {  //TODO--this has to be in Carter's Format
   unsigned long wkul = 123456;
   if (!Force.FFReport) return;
   if ((ET % Force.FFReportTime <= 1) && !sentalready) {
-    Serial.printf("FFTSnd: ET= %lu\t FF = %.2f\n", ET, Force.FFVal);  //diagnostic
+    //Serial.printf("FFTSnd: ET= %lu\t FF = %.2f\n", ET, Force.FFVal);  //diagnostic
     //StringBLETX("FF:" + String(getEpochTime()) + "," + String(Force.FFVal));
     wkul = getEpochTime();
     memcpy(TxString, &wkul, sizeof(unsigned long));
@@ -279,7 +279,7 @@ void HFSend(unsigned long ET) {
   static bool sentalready = false;
   if (!Force.HFReport) return;
   if ((ET % Force.HFReportTime <= 1) && !sentalready) {
-    Serial.printf("HFsend: HF = %.2f\tEpoch Time (ms) = %lu\n", Force.HFVal, ET);  //diagnostic
+    //Serial.printf("HFsend: HF = %.2f\tEpoch Time (ms) = %lu\n", Force.HFVal, ET);  //diagnostic
     StringBLETX("HF:" + String(Force.HFVal), true);
     sentalready = true;
   }
@@ -410,6 +410,8 @@ void GoToSleep(String DSmsg) {
   MorseChar(SHAVE_HAIRCUT);
   digitalWrite(ShutDownPin, HIGH);       //power off
   Serial.println("This never happens");  //actually, does because voltage takes a little while to drop
+  Serial.println("If this happens, programmer is holding power on");
+  ESP.restart();    //programmer holds power on; this makes it shutdown anyway
 }
 
 void SoundBuzz(u_long cwFreq, int sound_ms) {
@@ -501,7 +503,7 @@ void RunTimeCheck() {
   //increments sleep timer by seconds
   static bool firsttime = true;
   int runtimeseconds = (millis() / 1000 - SleepTimerStart);
-  Serial.printf("idle time = %d seconds\n", runtimeseconds);
+  Serial.printf("idle time = %d seconds; SleepStart = %lu seconds\n", runtimeseconds, SleepTimerStart);
   if ((runtimeseconds > (SleepTimeMax - 30)) && (firsttime == true)) {
     Serial.println("Idlewarning");
     MorseChar('s');
