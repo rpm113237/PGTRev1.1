@@ -2,7 +2,7 @@ void RxStringParse(void) {
 
   String tagStr = "";
   String valStr = "";
-   //C:12.3; C is tag, 12.3 is val
+  //C:12.3; C is tag, 12.3 is val
 
   if ((rxValue.length() > 0)) {  //nothing to do if len = 0
     //Serial.println("rxValue " + rxValue);
@@ -20,12 +20,12 @@ void RxStringParse(void) {
     else if (tagStr == "P") SetPwd(valStr);
     else if (tagStr == "O") DoOTA();
     else if (tagStr == "C") CalibrateScale(valStr);
-    else if (tagStr == "TR") DoTare();                       //not sure why we need this
-    else if (tagStr == "FRQ") SetFFRate(valStr);             //Start sending FF data at rate int valstr
-    else if (tagStr == "BP") StringBLETX(BatSnsCk(), true);  // query only.
+    else if (tagStr == "TR") DoTare();                                       //not sure why we need this
+    else if (tagStr == "FRQ") SetFFRate(valStr);                             //Start sending FF data at rate int valstr
+    else if (tagStr == "BP") StringBLETX("BP:" + String(BattSOC), true);     // batt SOC query only.
+    else if (tagStr == "BV") StringBLETX("BV:" + String(BattVolts), true);  // batt SOC query only.
     else if (tagStr == "ET") SetEpochTime(valStr);
     else if (tagStr == "R") StringBLETX(("R:" + REV_LEVEL), true);  // this is a report--
-    // else if (tagStr == "V") CalibrateADC(valStr);
     else if (tagStr == "HF") SetHFRate(valStr);  //Set HF reporting Rate
     // else if (tagStr == "MR") SetMeanReportTime(valStr);  //Set Rate at which Mean is reported
     else if (tagStr == "MT") SetMeanTime(valStr);      // Set Time over which Mean is calculated.
@@ -36,14 +36,14 @@ void RxStringParse(void) {
   }
 }
 
-void SetBootNum(String valStr) {  //mean calculation time (seconds)  
-  bootCount = atoi(valStr.c_str());   //atoi returns zero if invalid  
+void SetBootNum(String valStr) {     //mean calculation time (seconds)
+  bootCount = atoi(valStr.c_str());  //atoi returns zero if invalid
   prefs.putUInt("NumBoots", bootCount);
 }
 
-void SetTotalRunTime(String valStr) {  //mean calculation time (seconds)  
-char *end;
-  Force.TotalRuntime = strtoll(valStr.c_str(), &end,0);   //atoi returns zero if invalid  
+void SetTotalRunTime(String valStr) {  //mean calculation time (seconds)
+  char *end;
+  Force.TotalRuntime = strtoll(valStr.c_str(), &end, 0);  //atoi returns zero if invalid
   prefs.putUInt("TotalRunTime", Force.TotalRuntime);
   //end of run will update to time in THIS run.
 }
@@ -353,44 +353,51 @@ void print_wakeup_reason() {
 }
 
 
-String BatSnsCk(void) {
+void BatSnsCk(void) {
 
-  int battpcnt;
-  int battvoltx100 = 0;                               //batt volts *100, rounded to int
-  battvolts = adcSensor.getSingleEndedMillivolts(0);  //Batt_SW is on channel zero.
-  Serial.printf("VBAT_SW = %.0f millivolts\n", battvolts);
+  BattVolts = lipo.getVoltage();
+  BattSOC = lipo.getSOC();
+  int battpcnt = (int)BattSOC;
+  float battchngrate = lipo.getChangeRate();
+  if (battchngrate==0) battchngrate = 0.0001; //avoid divide by zero 
+  BattLife = (BattSOC-BattShutDownPcnt)/battchngrate;
 
-  //reference: https://blog.ampow.com/lipo-voltage-chart/
-  battvoltx100 = roundf(battvolts / 10);  //battvolts is in mv now
-  battpcnt = 0;                           //default
-  if (battvoltx100 >= 420) battpcnt = 100;
-  else if (battvoltx100 > 415) battpcnt = 95;
-  else if (battvoltx100 > 411) battpcnt = 90;
-  else if (battvoltx100 > 408) battpcnt = 85;
-  else if (battvoltx100 > 402) battpcnt = 80;
-  else if (battvoltx100 > 398) battpcnt = 75;
-  else if (battvoltx100 > 395) battpcnt = 70;
-  else if (battvoltx100 > 391) battpcnt = 65;
-  else if (battvoltx100 > 387) battpcnt = 60;
-  else if (battvoltx100 > 385) battpcnt = 55;
-  else if (battvoltx100 > 384) battpcnt = 50;
-  else if (battvoltx100 > 382) battpcnt = 45;
-  else if (battvoltx100 > 380) battpcnt = 40;
-  else if (battvoltx100 > 379) battpcnt = 35;
-  else if (battvoltx100 > 377) battpcnt = 30;
-  else if (battvoltx100 > 375) battpcnt = 25;
-  else if (battvoltx100 > 373) battpcnt = 20;
-  else if (battvoltx100 > 371) battpcnt = 15;
-  else if (battvoltx100 > 369) battpcnt = 10;
-  else if (battvoltx100 > 361) battpcnt = 05;
 
-  //Serial.printf("ADCRaw = %.1f\tbatt mult = %f\t batt volts = %.3f \t numrdgs = %d\t", battrdg, BatSnsFactor, battvolts, NumADCRdgs);
-  //Serial.println("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
-  if (battpcnt < BattShutDownPcnt) GoToSleep(" Battery critically low = " + String(battvolts) + "millivolts; going to sleep");
+
+  // int battpcnt;
+  // int battvoltx100 = 0;                               //batt volts *100, rounded to int
+  //battvolts = adcSensor.getSingleEndedMillivolts(0);  //Batt_SW is on channel zero.
+  Serial.printf("VBAT = %.0f millivolts\n", BattVolts * 1000);
+
+  // //reference: https://blog.ampow.com/lipo-voltage-chart/
+  // battvoltx100 = roundf(battvolts / 10);  //battvolts is in mv now
+  // battpcnt = 0;                           //default
+  // if (battvoltx100 >= 420) battpcnt = 100;
+  // else if (battvoltx100 > 415) battpcnt = 95;
+  // else if (battvoltx100 > 411) battpcnt = 90;
+  // else if (battvoltx100 > 408) battpcnt = 85;
+  // else if (battvoltx100 > 402) battpcnt = 80;
+  // else if (battvoltx100 > 398) battpcnt = 75;
+  // else if (battvoltx100 > 395) battpcnt = 70;
+  // else if (battvoltx100 > 391) battpcnt = 65;
+  // else if (battvoltx100 > 387) battpcnt = 60;
+  // else if (battvoltx100 > 385) battpcnt = 55;
+  // else if (battvoltx100 > 384) battpcnt = 50;
+  // else if (battvoltx100 > 382) battpcnt = 45;
+  // else if (battvoltx100 > 380) battpcnt = 40;
+  // else if (battvoltx100 > 379) battpcnt = 35;
+  // else if (battvoltx100 > 377) battpcnt = 30;
+  // else if (battvoltx100 > 375) battpcnt = 25;
+  // else if (battvoltx100 > 373) battpcnt = 20;
+  // else if (battvoltx100 > 371) battpcnt = 15;
+  // else if (battvoltx100 > 369) battpcnt = 10;
+  // else if (battvoltx100 > 361) battpcnt = 05;
+
+  if (battpcnt < BattShutDownPcnt) GoToSleep(" Battery critically low = " + String(BattVolts) + " volts; going to sleep");
   setLED(BlinkTime, clrs.BLUE);
   if (battpcnt < BattWarnPcnt) setLED(BlinkTime, clrs.YELLOW);
   if (battpcnt < BattCritPcnt) setLED(BlinkTime, clrs.RED);
-  return String("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
+  //return String("BP:" + String(battpcnt) + String((battpcnt * BattFullTime) / 100));
 }
 
 void GoToSleep(String DSmsg) {
@@ -401,8 +408,8 @@ void GoToSleep(String DSmsg) {
   Serial.println("Force.TotalRuntime @ shutdown =" + String(runtime));
   prefs.putULong("TotalRunTime", runtime);
   MorseChar(SHAVE_HAIRCUT);
-  digitalWrite(ShutDownPin, HIGH);  //power off
-  Serial.println("This never happens");   //actually, does because voltage takes a little while to drop
+  digitalWrite(ShutDownPin, HIGH);       //power off
+  Serial.println("This never happens");  //actually, does because voltage takes a little while to drop
 }
 
 void SoundBuzz(u_long cwFreq, int sound_ms) {

@@ -4,8 +4,9 @@
 #include <TickTwo.h>
 #include "Squeezer.h"
 #include <Adafruit_NeoPixel.h>
-#include <HX711.h>  
-#include <SparkFun_ADS1015_Arduino_Library.h>  //See Sketch ADS1015_RPM_Multichannel
+#include <HX711.h>
+
+#include <SparkFun_MAX1704x_Fuel_Gauge_Arduino_Library.h>  //
 #include <Wire.h>
 #include <Preferences.h>
 //OTA includes--taken from ElegantOTA demo example
@@ -22,7 +23,8 @@ static const BaseType_t app_cpu = 1;
 #endif
 //the c3 seems to run on 0 regardless of where it is set.
 
-ADS1015 adcSensor;
+//ADS1015 adcSensor;
+SFE_MAX1704X lipo(MAX1704X_MAX17048);  // Create a MAX17048
 
 Preferences prefs;
 
@@ -33,9 +35,9 @@ HX711 scale;
 Adafruit_NeoPixel pixels(NEOPIXELS, NEOPIN, NEO_GRB + NEO_KHZ800);  //1 ea sk6812 on IO 8
 
 
-TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);  //calls LEDBlink, called every 10MS, repeats forever, resolution MS
+TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);                   //calls LEDBlink, called every 10MS, repeats forever, resolution MS
 TickTwo BattChecker(BatSnsCk, Batt_CK_Interval, 0, MILLIS);  //checks battery every Batt_Ck_Interval
-TickTwo SleepChecker(RunTimeCheck, 10000, 0, MILLIS);  //check sleeptimers every ten seconds
+TickTwo SleepChecker(RunTimeCheck, 10000, 0, MILLIS);        //check sleeptimers every ten seconds
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pTxCharacteristic;
@@ -103,13 +105,14 @@ void setup() {
   pinMode(ShutDownPin, OUTPUT);    //pulled down with 100K, has to be active high
   digitalWrite(ShutDownPin, LOW);  // race against release. switch should still be closed.
   Serial.begin(115200);
-  while (digitalRead(StartButton) == HIGH);// Serial.println("Waiting Start Button Release");
+  while (digitalRead(StartButton) == HIGH)
+    ;  // Serial.println("Waiting Start Button Release");
   Serial.println("Hello; PGT RevLevel =" + REV_LEVEL);
 
   ledcAttach(buzzPin, freq, resolution);  //eight bit resolution--why? (Jun24?); using for PWM
   setLED(00, clrs.GREEN);
-  LEDBlink();             //Give them a green.  
-  Soundwakeup();          //wake up feedback
+  LEDBlink();     //Give them a green.
+  Soundwakeup();  //wake up feedback
 
   print_wakeup_reason();  //output and store wakeup count
 
@@ -126,7 +129,7 @@ void setup() {
     NIMBLE_PROPERTY::NOTIFY
     // BLECharacteristic::PROPERTY_NOTIFY
   );
-   BLECharacteristic* pRxCharacteristic = pService->createCharacteristic(
+  BLECharacteristic* pRxCharacteristic = pService->createCharacteristic(
     CHARACTERISTIC_UUID_RX,
     NIMBLE_PROPERTY::WRITE);
 
@@ -139,23 +142,34 @@ void setup() {
 
   //setup ADS1015
   Wire.begin(sda_rpm, scl_rpm);
-  if (adcSensor.begin(ADC_addr_rpm) == true)  // 0x48 is default
-  {
-    Serial.println("ADS1015 ADC found. I2C connections are good.");
-  } else {
-    Serial.println("ADS1015 not found. Check wiring. Stalled forever");
-    while (1);  // stall out forever
-  }
-  // Set the Gain
-  adcSensor.setGain(ADS1015_CONFIG_PGA_TWOTHIRDS);
-  //set the sample rate
-  adcSensor.setSampleRate(ADS1015_CONFIG_RATE_1600HZ);
+  // if (adcSensor.begin(ADC_addr_rpm) == true)  // 0x48 is default
+  // {
+  //   Serial.println("ADS1015 ADC found. I2C connections are good.");
+  // } else {
+  //   Serial.println("ADS1015 not found. Check wiring. Stalled forever");
+  //   while (1);  // stall out forever
+  // }
+  // // Set the Gain
+  // adcSensor.setGain(ADS1015_CONFIG_PGA_TWOTHIRDS);
+  // //set the sample rate
+  // adcSensor.setSampleRate(ADS1015_CONFIG_RATE_1600HZ);
 
-  // For the fastest conversion timing, we need to check the Config Register Operational Status bit
-  // to see when the conversion is complete - instead of using a fixed delay.
-  adcSensor.useConversionReady(true);  
-  //Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));
-    
+  // // For the fastest conversion timing, we need to check the Config Register Operational Status bit
+  // // to see when the conversion is complete - instead of using a fixed delay.
+  // adcSensor.useConversionReady(true);
+  // //Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));
+
+  Wire.begin(sda_rpm, scl_rpm);
+
+  lipo.enableDebugging();     // Uncomment this line to enable helpful debug messages on Serial
+  if (lipo.begin() == false)  // Connect to the MAX17048 using the default wire port
+  {
+    Serial.println(F("MAX17043 not detected. Please check wiring. Freezing forever."));
+    while (1);
+  }
+  
+  lipo.quickStart();// Quick start restarts the MAX17048 in hopes of getting a more accurate guess for the SOC.
+
   //start the TickTwo timers
   LEDtimer.start();      //start LED timer
   BattChecker.start();   //start Batt checker
@@ -167,7 +181,7 @@ void setup() {
   prefs.begin("PWD");
   prefs.begin("TotalRunTime");  //run time in minutes? 10K minutes = 166hrs.  Not long enough.
   prefs.begin("ScaleScale");
-  prefs.begin("NumBoots"); //number of time the unit has powered up
+  prefs.begin("NumBoots");  //number of time the unit has powered up
   //Serial.println( "Scale Calibration at start up =" + String(prefs.getFloat("ScaleScale")));
   setFlashDefaults();
 
@@ -184,9 +198,9 @@ void setup() {
   else Serial.println("Unknown Base Rate =" + String(BaseSampleRate));
 
   scale.begin(HX711_dout, HX711_sck);
-  scale.reset();  //if coming out of deep sleep; scale might be powered down
+  scale.reset();        //if coming out of deep sleep; scale might be powered down
   scale.tare(NumTare);  // reset the scale to 0
-  
+
   scaleCalVal = prefs.getFloat("ScaleScale");
   if (isnan(scaleCalVal)) {
     Serial.println("Scale Cal not loaded, use default--check default typicality");
@@ -205,7 +219,7 @@ void setup() {
   BlinkTime = CNCT_LED_BLINK_TIME;
   setLED(250, clrs.BLUE);  //blinking for connect
   Serial.println("Revision level = " + REV_LEVEL);
-  Serial.println(BatSnsCk());  //sets color for connect led
+  BatSnsCk();  //sets color for connect led
   //BatSnsCk();   //do once on start up--doesn't report.
 
   timesInit();  //

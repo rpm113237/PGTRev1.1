@@ -45,9 +45,14 @@ const int RatePin = 10;  // = 0 for 10 sps, 1 for 80 sps
 const int NEOPIN = 8; 
 const int NEOPIXELS = 1;    //One LED
 
-const int ADC_addr_rpm = 0X48;
+//const int ADC_addr_rpm = 0X48;
 const int sda_rpm = 5;
 const int scl_rpm = 4;
+double BattVolts = 0; // Variable to keep track of LiPo voltage
+double BattSOC = 0; // Variable to keep track of LiPo state-of-charge (SOC)
+double BattLife;    // calculated from lipo.getchangerate
+//bool alert; // Variable to keep track of whether alert has been triggered
+
 struct ForceStruct {
   /* Force is accumulated and averages calculated based on scale. Reporting is synchronous tied to TickTwo
   for now; ony rate for FF, HF is settable; the report time will be set as (1000/rate) milliseconds.
@@ -106,7 +111,7 @@ int BlinkTime = CNCT_LED_BLINK_TIME;  //blink ON/OFF TIME; if ==0, ON
 int LEDSelect = 0;                    //0 or 1; make enum
 const int BatSns = 2;
 const int NumADCRdgs = 10;  //number of times to read ADC in floatADC
-float battvolts = 0.0;
+//float battvolts = 0.0;
 float Batt_HI_Lvl = 3.6;
 float Batt_OK_Lvl = 3.5;
 float Batt_LO_Lvl = 3.3;
@@ -140,7 +145,7 @@ void setLED(int btime, int clrarray[]);
 void VibSend(void);
 void StringBLETX(String msg, bool SndSer);
 void LEDBlink(void);
-String BatSnsCk(void);
+void BatSnsCk(void);
 void BLEReconnect(void);
 void CheckForce(void);
 
