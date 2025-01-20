@@ -367,7 +367,9 @@ void BatSnsCk(void) {
   // int battpcnt;
   // int battvoltx100 = 0;                               //batt volts *100, rounded to int
   //battvolts = adcSensor.getSingleEndedMillivolts(0);  //Batt_SW is on channel zero.
-  Serial.printf("VBAT = %.0f millivolts\n", BattVolts * 1000);
+  // Serial.printf("VBAT = %.0f millivolts\n", BattVolts * 1000);
+  
+
 
   // //reference: https://blog.ampow.com/lipo-voltage-chart/
   // battvoltx100 = roundf(battvolts / 10);  //battvolts is in mv now
@@ -409,6 +411,10 @@ void GoToSleep(String DSmsg) {
   prefs.putULong("TotalRunTime", runtime);
   MorseChar(SHAVE_HAIRCUT);
   digitalWrite(ShutDownPin, HIGH);       //power off
+  while (digitalRead(StartButton) == HIGH) {
+    Serial.println("Waiting Stopbutton Button Release");    //this won't happen while prgrmer connected
+    MorseChar('e');
+  }
   Serial.println("This never happens");  //actually, does because voltage takes a little while to drop
   Serial.println("If this happens, programmer is holding power on");
   ESP.restart();    //programmer holds power on; this makes it shutdown anyway
@@ -420,9 +426,9 @@ void SoundBuzz(u_long cwFreq, int sound_ms) {
   u_long smillis;
   // Serial.printf(" Freq =%d HZ, for %d ms\n", cwFreq, sound_ms);
   smillis = millis();
-  ledcAttach(buzzPin, freq, resolution);  //eight bit resolution--why? (Jun24?)
+  ledcAttach(buzzPin, cwFreq, resolution);  //eight bit resolution--why? (Jun24?)
   ledcWrite(buzzPin, dutycycle);
-  while ((millis() - smillis) < sound_ms) {}
+  while ((millis() - smillis) < sound_ms);
   ledcWrite(buzzPin, 0);  //off
 }
 
@@ -442,7 +448,7 @@ void MorseChar(int cwChar) {
   int dahTime;
   dahTime = 3 * ditTime;  //there is a space time defined in .h
   cwChar = tolower(cwChar);
-  //Serial.printf("character %d called\n", cwChar);
+  //Serial.printf("character %C called\n", cwChar);
   if (cwChar == 's') {
 
     SoundElement(ditTime);  //dit

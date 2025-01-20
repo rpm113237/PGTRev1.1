@@ -1,7 +1,7 @@
 #ifndef _SQUEEZER_H
 #define _SQUEEZER_H
 //#include <Adafruit_NeoPixel.h>
-String REV_LEVEL = "11Nov24 9e0bcaff";  //actually, include last part of commit number
+String REV_LEVEL = "5Jan25 03ec5d0 ";  //last part of commit number
 
 #define CNCT_LED_BLINK_TIME 1000     //BLINK TIME FOR CONNECT LED
 #define MS_TO_SEC 1000               //convert to secs
@@ -38,7 +38,7 @@ const int HX711_dout = 39;  //mcu > HX711 dout pin
 const int HX711_sck = 38;   //mcu > HX711 sck pin
 //GPIO
 const int StartButton = 21;  //
-const int ShutDownPin = 18;
+const int ShutDownPin = 20;
 const int buzzPin = 48;
 const int RatePin = 45;  // = 0 for 10 sps, 1 for 80 sps
 //NeoPins
@@ -91,7 +91,7 @@ const int VIB_SND_INTERVAL = 1000;  //ms
 int ditTime = 75, chSpTime = 225;  //dit and dah
 u_long cwFreq = 2500;
 
-int freq = 500;
+//int freq = 2000;
 const int ledChannel = 0;
 const int resolution = 8;
 const int dutycycle = 127;  //50 percent +/-

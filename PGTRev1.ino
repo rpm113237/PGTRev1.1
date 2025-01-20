@@ -104,15 +104,19 @@ void setup() {
   pinMode(StartButton, INPUT);
   pinMode(ShutDownPin, OUTPUT);    //pulled down with 100K, has to be active high
   digitalWrite(ShutDownPin, LOW);  // race against release. switch should still be closed.
-  Serial.begin(115200);
-  while (digitalRead(StartButton) == HIGH)
-    ;  // Serial.println("Waiting Start Button Release");
-  Serial.println("Hello; PGT RevLevel =" + REV_LEVEL);
-
-  ledcAttach(buzzPin, freq, resolution);  //eight bit resolution--why? (Jun24?); using for PWM
+  Serial.begin(115200);  
+  ledcAttach(buzzPin, cwFreq, resolution);  //eight bit resolution--why? (Jun24?); using for PWM
   setLED(00, clrs.GREEN);
   LEDBlink();     //Give them a green.
   Soundwakeup();  //wake up feedback
+
+  while (digitalRead(StartButton) == HIGH) {
+    Serial.println("Waiting Start Button Release");
+  } //to avoid another shutdown
+
+  Serial.println("Hello; PGT RevLevel =" + REV_LEVEL);
+  // GoToSleep("Test Go Sleep, remove later");
+
 
   print_wakeup_reason();  //output and store wakeup count
 
@@ -165,10 +169,11 @@ void setup() {
   if (lipo.begin() == false)  // Connect to the MAX17048 using the default wire port
   {
     Serial.println(F("MAX17043 not detected. Please check wiring. Freezing forever."));
-    while (1);
+    while (1)
+      ;
   }
-  
-  lipo.quickStart();// Quick start restarts the MAX17048 in hopes of getting a more accurate guess for the SOC.
+
+  lipo.quickStart();  // Quick start restarts the MAX17048 in hopes of getting a more accurate guess for the SOC.
 
   //start the TickTwo timers
   LEDtimer.start();      //start LED timer
@@ -220,6 +225,8 @@ void setup() {
   setLED(250, clrs.BLUE);  //blinking for connect
   Serial.println("Revision level = " + REV_LEVEL);
   BatSnsCk();  //sets color for connect led
+  Serial.printf("VBAT = %.0f millivolts\n", BattVolts * 1000);
+  Serial.printf("SOC = %.2f%%\n", BattSOC);
   //BatSnsCk();   //do once on start up--doesn't report.
 
   timesInit();  //
