@@ -17,16 +17,17 @@ void RxStringParse(void) {
     } else valStr = "";  //null for checking
     if (tagStr == "X") GoToSleep("The Boss said GoodNight, power off");
     else if (tagStr == "S") SetSSID(valStr);
+    //else if (tagStr=="S?") ReportSSID();
     else if (tagStr == "P") SetPwd(valStr);
     else if (tagStr == "O") DoOTA();
     else if (tagStr == "C") CalibrateScale(valStr);
-    else if (tagStr == "TR") DoTare();                                       //not sure why we need this
-    else if (tagStr == "FRQ") SetFFRate(valStr);                             //Start sending FF data at rate int valstr
-    else if (tagStr == "BP") StringBLETX("BP:" + String(BattSOC), true);     // batt SOC query only.
+    else if (tagStr == "TR") DoTare();                                      //not sure why we need this
+    else if (tagStr == "FRQ") SetFFRate(valStr);                            //Start sending FF data at rate int valstr
+    else if (tagStr == "BP") StringBLETX("BP:" + String(BattSOC), true);    // batt SOC query only.
     else if (tagStr == "BV") StringBLETX("BV:" + String(BattVolts), true);  // batt SOC query only.
     else if (tagStr == "ET") SetEpochTime(valStr);
     else if (tagStr == "R") StringBLETX(("R:" + REV_LEVEL), true);  // this is a report--
-    else if (tagStr == "HF") SetHFRate(valStr);  //Set HF reporting Rate
+    else if (tagStr == "HF") SetHFRate(valStr);                     //Set HF reporting Rate
     // else if (tagStr == "MR") SetMeanReportTime(valStr);  //Set Rate at which Mean is reported
     else if (tagStr == "MT") SetMeanTime(valStr);      // Set Time over which Mean is calculated.
     else if (tagStr == "NUM") SetBootNum(valStr);      //Set BootNum; if null reset
@@ -34,6 +35,14 @@ void RxStringParse(void) {
     else Serial.println("Unknown Tag =" + tagStr);
     rxValue.clear();  //erases
   }
+}
+
+void ReportSSID() {
+  strcpy(SSstr, prefs.getString("SSID", DefaultSSID).c_str());  //SSstr is init in squeezer.h
+  strcpy(PWDstr, prefs.getString("PWD", DefaultPWD).c_str());   //PWDstr is init in squeezer.h
+  StringBLETX("S:" + String(SSstr), true);
+  Serial.printf("SSID = %s \n", SSstr);
+  Serial.printf("PWD = %s \n", PWDstr);
 }
 
 void SetBootNum(String valStr) {     //mean calculation time (seconds)
@@ -112,6 +121,7 @@ void SetSSID(String ValStr) {
   String tempStr = String(SSstr);    //new or default,
   prefs.putString("SSID", tempStr);  //store in flash as c++ String
   Serial.println("SetSSid string = " + tempStr);
+  StringBLETX("S:" + prefs.getString("SSID"),true);
   return;
 }
 
@@ -123,6 +133,7 @@ void SetPwd(String ValStr) {
   String tempStr = String(PWDstr);  //new or default,
   prefs.putString("PWD", tempStr);  //store in flash as c++ String
   Serial.println("SetPWD string = " + tempStr);
+  StringBLETX("P:" + prefs.getString("PWD"),true);
   return;
 }
 
@@ -144,6 +155,7 @@ void DoOTA(void) {
     server.handleClient();
     ElegantOTA.loop();
     SleepChecker.update();  //check for timeout
+    ResetSwitch();          //check for reset bailout
   }
   return;
 }
@@ -359,43 +371,14 @@ void BatSnsCk(void) {
   BattSOC = lipo.getSOC();
   int battpcnt = (int)BattSOC;
   float battchngrate = lipo.getChangeRate();
-  if (battchngrate==0) battchngrate = 0.0001; //avoid divide by zero 
-  BattLife = (BattSOC-BattShutDownPcnt)/battchngrate;
-
-
-
-  // int battpcnt;
-  // int battvoltx100 = 0;                               //batt volts *100, rounded to int
-  //battvolts = adcSensor.getSingleEndedMillivolts(0);  //Batt_SW is on channel zero.
-  // Serial.printf("VBAT = %.0f millivolts\n", BattVolts * 1000);
-  
-
+  if (battchngrate == 0) battchngrate = 0.0001;  //avoid divide by zero
+  BattLife = (BattSOC - BattShutDownPcnt) / battchngrate;
 
   // //reference: https://blog.ampow.com/lipo-voltage-chart/
-  // battvoltx100 = roundf(battvolts / 10);  //battvolts is in mv now
-  // battpcnt = 0;                           //default
-  // if (battvoltx100 >= 420) battpcnt = 100;
-  // else if (battvoltx100 > 415) battpcnt = 95;
-  // else if (battvoltx100 > 411) battpcnt = 90;
-  // else if (battvoltx100 > 408) battpcnt = 85;
-  // else if (battvoltx100 > 402) battpcnt = 80;
-  // else if (battvoltx100 > 398) battpcnt = 75;
-  // else if (battvoltx100 > 395) battpcnt = 70;
-  // else if (battvoltx100 > 391) battpcnt = 65;
-  // else if (battvoltx100 > 387) battpcnt = 60;
-  // else if (battvoltx100 > 385) battpcnt = 55;
-  // else if (battvoltx100 > 384) battpcnt = 50;
-  // else if (battvoltx100 > 382) battpcnt = 45;
-  // else if (battvoltx100 > 380) battpcnt = 40;
-  // else if (battvoltx100 > 379) battpcnt = 35;
-  // else if (battvoltx100 > 377) battpcnt = 30;
-  // else if (battvoltx100 > 375) battpcnt = 25;
-  // else if (battvoltx100 > 373) battpcnt = 20;
-  // else if (battvoltx100 > 371) battpcnt = 15;
-  // else if (battvoltx100 > 369) battpcnt = 10;
-  // else if (battvoltx100 > 361) battpcnt = 05;
 
-  if (battpcnt < BattShutDownPcnt) GoToSleep(" Battery critically low = " + String(BattVolts) + " volts; going to sleep");
+  if (battpcnt < BattShutDownPcnt) {
+    if (battchngrate < 0) GoToSleep(" Battery critically low; SOC = " + String(BattSOC) + "%%; going to sleep");
+  }  // if SOC low and not charging, shut down.
   setLED(BlinkTime, clrs.BLUE);
   if (battpcnt < BattWarnPcnt) setLED(BlinkTime, clrs.YELLOW);
   if (battpcnt < BattCritPcnt) setLED(BlinkTime, clrs.RED);
@@ -410,14 +393,14 @@ void GoToSleep(String DSmsg) {
   Serial.println("Force.TotalRuntime @ shutdown =" + String(runtime));
   prefs.putULong("TotalRunTime", runtime);
   MorseChar(SHAVE_HAIRCUT);
-  digitalWrite(ShutDownPin, HIGH);       //power off
+  digitalWrite(ShutDownPin, HIGH);  //power off
   while (digitalRead(StartButton) == HIGH) {
-    Serial.println("Waiting Stopbutton Button Release");    //this won't happen while prgrmer connected
+    Serial.println("Waiting Stopbutton Button Release");  //this won't happen while prgrmer connected
     MorseChar('e');
   }
   Serial.println("This never happens");  //actually, does because voltage takes a little while to drop
   Serial.println("If this happens, programmer is holding power on");
-  ESP.restart();    //programmer holds power on; this makes it shutdown anyway
+  ESP.restart();  //programmer holds power on; this makes it shutdown anyway
 }
 
 void SoundBuzz(u_long cwFreq, int sound_ms) {
@@ -428,7 +411,8 @@ void SoundBuzz(u_long cwFreq, int sound_ms) {
   smillis = millis();
   ledcAttach(buzzPin, cwFreq, resolution);  //eight bit resolution--why? (Jun24?)
   ledcWrite(buzzPin, dutycycle);
-  while ((millis() - smillis) < sound_ms);
+  while ((millis() - smillis) < sound_ms)
+    ;
   ledcWrite(buzzPin, 0);  //off
 }
 
