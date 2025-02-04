@@ -23,27 +23,21 @@ static const BaseType_t app_cpu = 1;
 #endif
 //the c3 seems to run on 0 regardless of where it is set.
 
-//ADS1015 adcSensor;
 SFE_MAX1704X lipo(MAX1704X_MAX17048);  // Create a MAX17048
-
 Preferences prefs;
-
 WebServer server(80);
-
 HX711 scale;
-
 Adafruit_NeoPixel pixels(NEOPIXELS, NEOPIN, NEO_GRB + NEO_KHZ800);  //1 ea sk6812 on IO 8
-
-
 TickTwo LEDtimer(LEDBlink, 10, 0, MILLIS);                   //calls LEDBlink, called every 10MS, repeats forever, resolution MS
 TickTwo BattChecker(BatSnsCk, Batt_CK_Interval, 0, MILLIS);  //checks battery every Batt_Ck_Interval
 TickTwo SleepChecker(RunTimeCheck, 10000, 0, MILLIS);        //check sleeptimers every ten seconds
 
 BLEServer* pServer = NULL;
 BLECharacteristic* pTxCharacteristic;
+
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
-float txValue = 0;
+//float txValue = 0;
 String rxValue{};  // so can process outside of callback; maybe not the best idea
 
 // See the following for generating UUIDs:
@@ -117,7 +111,6 @@ void setup() {
   Serial.println("Hello; PGT RevLevel =" + REV_LEVEL);
   // GoToSleep("Test Go Sleep, remove later");
 
-
   print_wakeup_reason();  //output and store wakeup count
 
   // Create the BLE Device
@@ -144,27 +137,8 @@ void setup() {
   pServer->getAdvertising()->start();
   // Serial.printf("BLE advertising time = %lu ms\n", (millis()-lagmsStart));
 
-  //setup ADS1015
   Wire.begin(sda_rpm, scl_rpm);
-  // if (adcSensor.begin(ADC_addr_rpm) == true)  // 0x48 is default
-  // {
-  //   Serial.println("ADS1015 ADC found. I2C connections are good.");
-  // } else {
-  //   Serial.println("ADS1015 not found. Check wiring. Stalled forever");
-  //   while (1);  // stall out forever
-  // }
-  // // Set the Gain
-  // adcSensor.setGain(ADS1015_CONFIG_PGA_TWOTHIRDS);
-  // //set the sample rate
-  // adcSensor.setSampleRate(ADS1015_CONFIG_RATE_1600HZ);
-
-  // // For the fastest conversion timing, we need to check the Config Register Operational Status bit
-  // // to see when the conversion is complete - instead of using a fixed delay.
-  // adcSensor.useConversionReady(true);
-  // //Serial.printf("After wakeup sound, green led time = %lu ms\n", (millis()-lagmsStart));
-
-  Wire.begin(sda_rpm, scl_rpm);
-
+    
   lipo.enableDebugging();     // Uncomment this line to enable helpful debug messages on Serial
   if (lipo.begin() == false)  // Connect to the MAX17048 using the default wire port
   {

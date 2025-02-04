@@ -31,6 +31,11 @@ const float scaleCalDeflt = 8545.85;  //measured on SN10
 const int NumWarmup = 10;
 const int NumTare = 10;
 char TxString[25];  // used to transmit
+// boolean to control serial diagnostic printouts.
+bool SerOutHF = false;  // if true, serial out HF
+bool SerOutFF = true;  // if true, serial out FF
+bool SerOutMN = false;  // if true, serial out MN
+bool SerOutIdle = false;// if true output idle time
 
 //efine pins
 //HX711 pins:
